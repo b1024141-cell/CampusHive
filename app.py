@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-import random
+from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
+
 
 # =========================
 # ページ設定
@@ -12,154 +14,256 @@ st.set_page_config(
     layout="centered"
 )
 
+
+# =========================
+# Google Sheets 接続
+# =========================
+
+conn = st.connection(
+    "gsheets",
+    type=GSheetsConnection
+)
+
+
+# =========================
+# タイトル
+# =========================
+
 st.title("🐝 Campus Hive")
-st.write("蜂の群知能を利用した大学内マッチング実験")
 
-# =========================
-# 学生データ
-# =========================
-
-students = pd.DataFrame({
-    "name": ["田中", "佐藤", "鈴木", "高橋", "伊藤", "山田"],
-    "AI": [5, 2, 4, 1, 3, 5],
-    "Python": [5, 1, 4, 2, 3, 5],
-    "数学": [4, 2, 5, 1, 3, 4],
-    "英語": [2, 5, 3, 4, 1, 2],
-    "ゲーム": [1, 5, 4, 2, 5, 1],
-    "旅行": [5, 3, 2, 4, 5, 2],
-    "目的": [
-        "勉強仲間",
-        "友達",
-        "ゲーム仲間",
-        "勉強仲間",
-        "旅行仲間",
-        "プロジェクト仲間"
-    ]
-})
-
-# =========================
-# セッション状態
-# =========================
-
-if "target" not in st.session_state:
-    st.session_state.target = None
-
-if "memory" not in st.session_state:
-    st.session_state.memory = {}
-
-# =========================
-# プロフィール
-# =========================
-
-st.header("👤 あなた")
-
-name = st.text_input(
-    "名前",
-    placeholder="名前を入力"
+st.write(
+    "蜂の群知能を利用した大学生向けマッチングアプリ"
 )
 
-purpose = st.selectbox(
-    "探したい相手",
-    [
-        "友達",
-        "勉強仲間",
-        "プロジェクト仲間",
-        "ゲーム仲間",
-        "旅行仲間"
-    ]
-)
+st.divider()
+
 
 # =========================
-# 探索
+# プロフィール登録
 # =========================
 
-st.header("🐝 探索")
+st.header("🌸 プロフィールを登録")
 
-if st.button("🐝 花を探索する", use_container_width=True):
 
-    candidates = students[
-        students["目的"] == purpose
-    ]
+with st.form("profile_form"):
 
-    if len(candidates) > 0:
+    name = st.text_input(
+        "名前・ニックネーム",
+        placeholder="例：あずみ"
+    )
 
-        target = candidates.sample(1).iloc[0]
+    grade = st.selectbox(
+        "学年",
+        [
+            "1年",
+            "2年",
+            "3年",
+            "4年",
+            "大学院生"
+        ]
+    )
 
-        st.session_state.target = target
+    department = st.text_input(
+        "学科",
+        placeholder="例：複雑系知能学科"
+    )
+
+    purpose = st.multiselect(
+        "探したい相手",
+        [
+            "友達",
+            "勉強仲間",
+            "プロジェクト仲間",
+            "ゲーム仲間",
+            "旅行仲間",
+            "趣味仲間",
+            "就活仲間"
+        ]
+    )
+
+    strength = st.text_input(
+        "得意なこと",
+        placeholder="例：Python、数学、AI"
+    )
+
+    weakness = st.text_input(
+        "苦手・教えてほしいこと",
+        placeholder="例：英語、プレゼン"
+    )
+
+    hobby = st.text_input(
+        "趣味",
+        placeholder="例：ゲーム、旅行、カフェ巡り"
+    )
+
+    introduction = st.text_area(
+        "自己紹介",
+        placeholder="自分について自由に書いてください"
+    )
+
+    submitted = st.form_submit_button(
+        "🐝 プロフィールを登録する"
+    )
+
+
+# =========================
+# プロフィール保存
+# =========================
+
+if submitted:
+
+    if name.strip() == "":
+        st.warning("名前・ニックネームを入力してください。")
+
+    elif len(purpose) == 0:
+        st.warning("探したい相手を1つ以上選択してください。")
 
     else:
-        st.warning("条件に合う相手が見つかりませんでした。")
+
+        try:
+
+            # 現在のデータを取得
+            df = conn.read(
+                worksheet="Profiles",
+                ttl=0
+            )
+
+            # 空のシートだった場合
+            if df.empty:
+                df = pd.DataFrame(
+                    columns=[
+                        "id",
+                        "name",
+                        "grade",
+                        "department",
+                        "purpose",
+                        "strength",
+                        "weakness",
+                        "hobby",
+                        "introduction",
+                        "created_at"
+                    ]
+                )
+
+            # 新しいプロフィール
+            new_profile = pd.DataFrame([
+                {
+                    "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
+                    "name": name,
+                    "grade": grade,
+                    "department": department,
+                    "purpose": ", ".join(purpose),
+                    "strength": strength,
+                    "weakness": weakness,
+                    "hobby": hobby,
+                    "introduction": introduction,
+                    "created_at": datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                }
+            ])
+
+            # データを追加
+            df = pd.concat(
+                [df, new_profile],
+                ignore_index=True
+            )
+
+            # Google Sheetsを更新
+            conn.update(
+                worksheet="Profiles",
+                data=df
+            )
+
+            # キャッシュを削除
+            st.cache_data.clear()
+
+            st.success(
+                f"🐝 {name}さんのプロフィールを登録しました！"
+            )
+
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(
+                "プロフィールの登録に失敗しました。"
+            )
+
+            st.code(str(e))
+
 
 # =========================
-# 発見した相手
+# 登録済みプロフィール
 # =========================
 
-if st.session_state.target is not None:
+st.divider()
 
-    target = st.session_state.target
+st.header("🌼 Campus Hive のメンバー")
 
-    st.divider()
 
-    st.header("🌸 発見した学生")
+try:
 
-    st.subheader(target["name"])
-
-    st.write(
-        f"目的：{target['目的']}"
+    profiles = conn.read(
+        worksheet="Profiles",
+        ttl=0
     )
 
-    col1, col2 = st.columns(2)
+    if profiles.empty:
 
-    with col1:
-        st.write(f"AI：{'★' * target['AI']}")
-        st.write(f"Python：{'★' * target['Python']}")
-        st.write(f"数学：{'★' * target['数学']}")
+        st.info(
+            "まだ登録されているメンバーはいません。"
+        )
 
-    with col2:
-        st.write(f"英語：{'★' * target['英語']}")
-        st.write(f"ゲーム：{'★' * target['ゲーム']}")
-        st.write(f"旅行：{'★' * target['旅行']}")
+    else:
 
-    st.divider()
+        # 新しい人から表示
+        profiles = profiles.iloc[::-1]
 
-    st.write("🤝 実際に交流したら、満足度を入力してください。")
+        for _, person in profiles.iterrows():
 
-    satisfaction = st.slider(
-        "🍯 交流の満足度",
-        min_value=1,
-        max_value=5,
-        value=3
+            with st.container(border=True):
+
+                st.subheader(
+                    f"🌸 {person['name']}"
+                )
+
+                st.write(
+                    f"🎓 {person['grade']} / "
+                    f"{person['department']}"
+                )
+
+                st.write(
+                    f"🔎 探している相手："
+                    f"{person['purpose']}"
+                )
+
+                if person["strength"]:
+                    st.write(
+                        f"💪 得意：{person['strength']}"
+                    )
+
+                if person["weakness"]:
+                    st.write(
+                        f"📚 教えてほしい："
+                        f"{person['weakness']}"
+                    )
+
+                if person["hobby"]:
+                    st.write(
+                        f"🎮 趣味：{person['hobby']}"
+                    )
+
+                if person["introduction"]:
+                    st.write(
+                        f"💬 {person['introduction']}"
+                    )
+
+
+except Exception as e:
+
+    st.error(
+        "プロフィールを読み込めませんでした。"
     )
 
-    if st.button(
-        "🍯 経験を記録する",
-        use_container_width=True
-    ):
-
-        target_name = target["name"]
-
-        st.session_state.memory[target_name] = satisfaction
-
-        st.success(
-            f"🐝 {target_name}さんとの経験を記録しました！"
-        )
-
-        st.write(
-            f"満足度：{'🍯' * satisfaction}"
-        )
-
-# =========================
-# 自分の記憶
-# =========================
-
-if len(st.session_state.memory) > 0:
-
-    st.divider()
-
-    st.header("🧠 あなたの記憶")
-
-    for person, score in st.session_state.memory.items():
-
-        st.write(
-            f"🌸 {person}：{'🍯' * score}"
-        )
+    st.code(str(e))
