@@ -1,12 +1,10 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+from supabase import create_client, Client
 
 
-# =========================
+# ========================================
 # ページ設定
-# =========================
+# ========================================
 
 st.set_page_config(
     page_title="Campus Hive",
@@ -15,19 +13,25 @@ st.set_page_config(
 )
 
 
-# =========================
-# Google Sheets 接続
-# =========================
+# ========================================
+# Supabase接続
+# ========================================
 
-conn = st.connection(
-    "gsheets",
-    type=GSheetsConnection
-)
+@st.cache_resource
+def init_connection() -> Client:
+
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+
+    return create_client(url, key)
 
 
-# =========================
+supabase = init_connection()
+
+
+# ========================================
 # タイトル
-# =========================
+# ========================================
 
 st.title("🐝 Campus Hive")
 
@@ -38,9 +42,9 @@ st.write(
 st.divider()
 
 
-# =========================
+# ========================================
 # プロフィール登録
-# =========================
+# ========================================
 
 st.header("🌸 プロフィールを登録")
 
@@ -106,49 +110,31 @@ with st.form("profile_form"):
     )
 
 
-# =========================
+# ========================================
 # プロフィール保存
-# =========================
+# ========================================
 
 if submitted:
 
     if name.strip() == "":
-        st.warning("名前・ニックネームを入力してください。")
+        st.warning(
+            "名前・ニックネームを入力してください。"
+        )
 
     elif len(purpose) == 0:
-        st.warning("探したい相手を1つ以上選択してください。")
+        st.warning(
+            "探したい相手を1つ以上選択してください。"
+        )
 
     else:
 
         try:
 
-            # 現在のデータを取得
-            df = conn.read(
-                worksheet="Profiles",
-                ttl=0
-            )
-
-            # 空のシートだった場合
-            if df.empty:
-                df = pd.DataFrame(
-                    columns=[
-                        "id",
-                        "name",
-                        "grade",
-                        "department",
-                        "purpose",
-                        "strength",
-                        "weakness",
-                        "hobby",
-                        "introduction",
-                        "created_at"
-                    ]
-                )
-
-            # 新しいプロフィール
-            new_profile = pd.DataFrame([
+            # Supabaseに保存
+            response = supabase.table(
+                "profiles"
+            ).insert(
                 {
-                    "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
                     "name": name,
                     "grade": grade,
                     "department": department,
@@ -156,27 +142,9 @@ if submitted:
                     "strength": strength,
                     "weakness": weakness,
                     "hobby": hobby,
-                    "introduction": introduction,
-                    "created_at": datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
+                    "introduction": introduction
                 }
-            ])
-
-            # データを追加
-            df = pd.concat(
-                [df, new_profile],
-                ignore_index=True
-            )
-
-            # Google Sheetsを更新
-            conn.update(
-                worksheet="Profiles",
-                data=df
-            )
-
-            # キャッシュを削除
-            st.cache_data.clear()
+            ).execute()
 
             st.success(
                 f"🐝 {name}さんのプロフィールを登録しました！"
@@ -193,9 +161,9 @@ if submitted:
             st.code(str(e))
 
 
-# =========================
-# 登録済みプロフィール
-# =========================
+# ========================================
+# 登録されているメンバーを取得
+# ========================================
 
 st.divider()
 
@@ -204,12 +172,23 @@ st.header("🌼 Campus Hive のメンバー")
 
 try:
 
-    profiles = conn.read(
-        worksheet="Profiles",
-        ttl=0
-    )
+    response = supabase.table(
+        "profiles"
+    ).select(
+        "*"
+    ).order(
+        "created_at",
+        desc=True
+    ).execute()
 
-    if profiles.empty:
+    profiles = response.data
+
+
+    # ====================================
+    # メンバー表示
+    # ====================================
+
+    if len(profiles) == 0:
 
         st.info(
             "まだ登録されているメンバーはいません。"
@@ -217,10 +196,7 @@ try:
 
     else:
 
-        # 新しい人から表示
-        profiles = profiles.iloc[::-1]
-
-        for _, person in profiles.iterrows():
+        for person in profiles:
 
             with st.container(border=True):
 
