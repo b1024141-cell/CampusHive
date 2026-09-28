@@ -28,7 +28,90 @@ def init_connection() -> Client:
 
 supabase = init_connection()
 
+# =========================
+# ログイン状態
+# =========================
 
+session = supabase.auth.get_session()
+
+if session is None:
+
+    st.title("🐝 Campus Hive")
+
+    st.header("🔐 ログイン")
+
+    login_email = st.text_input(
+        "メールアドレス"
+    )
+
+    login_password = st.text_input(
+        "パスワード",
+        type="password"
+    )
+
+    if st.button("ログイン"):
+
+        try:
+
+            response = supabase.auth.sign_in_with_password({
+                "email": login_email,
+                "password": login_password
+            })
+
+            st.success("ログインしました！")
+
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(
+                "ログインに失敗しました。"
+            )
+
+            st.code(str(e))
+
+
+    st.divider()
+
+    st.header("🆕 新規登録")
+
+    signup_email = st.text_input(
+        "登録用メールアドレス"
+    )
+
+    signup_password = st.text_input(
+        "登録用パスワード",
+        type="password"
+    )
+
+
+    if st.button("アカウントを作成"):
+
+        try:
+
+            response = supabase.auth.sign_up({
+                "email": signup_email,
+                "password": signup_password
+            })
+
+            st.success(
+                "アカウントを作成しました！"
+            )
+
+            st.info(
+                "ログインしてください。"
+            )
+
+        except Exception as e:
+
+            st.error(
+                "アカウント作成に失敗しました。"
+            )
+
+            st.code(str(e))
+
+
+    st.stop()
 # =========================
 # タイトル
 # =========================
