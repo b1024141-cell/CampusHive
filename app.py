@@ -15,22 +15,18 @@ st.set_page_config(
 )
 
 
+
 # =========================================================
 # Supabase接続
 # =========================================================
 
-@st.cache_resource
-def init_connection():
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
 
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-
-    return create_client(url, key)
-
-
-supabase = init_connection()
-
-
+supabase = create_client(
+    url,
+    key
+)
 # =========================================================
 # セッション管理
 # =========================================================
