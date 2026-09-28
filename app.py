@@ -643,3 +643,110 @@ if st.button("💛 マッチする"):
         )
 
         st.code(str(e))
+        # ==================================================
+# マッチした人一覧
+# ==================================================
+
+st.divider()
+
+st.header("💕 マッチした人")
+
+
+try:
+
+    match_response = (
+        supabase
+        .table("matches")
+        .select("*")
+        .execute()
+    )
+
+    matches = match_response.data
+
+
+    my_matches = []
+
+    for match in matches:
+
+        if match["user1_id"] == my_profile["id"]:
+
+            matched_id = match["user2_id"]
+
+        elif match["user2_id"] == my_profile["id"]:
+
+            matched_id = match["user1_id"]
+
+        else:
+
+            continue
+
+
+        matched_person = next(
+
+            (
+                person
+                for person in profiles
+                if person["id"] == matched_id
+            ),
+
+            None
+
+        )
+
+
+        if matched_person:
+
+            my_matches.append(
+                matched_person
+            )
+
+
+    # -------------------------
+    # マッチがない場合
+    # -------------------------
+
+    if len(my_matches) == 0:
+
+        st.info(
+            "まだマッチした人はいません。"
+        )
+
+
+    # -------------------------
+    # マッチした人を表示
+    # -------------------------
+
+    else:
+
+        for person in my_matches:
+
+            with st.container(
+                border=True
+            ):
+
+                st.subheader(
+                    f"💕 {person['name']}"
+                )
+
+                st.write(
+                    f"🎓 {person['grade']} / "
+                    f"{person['department']}"
+                )
+
+                st.write(
+                    f"🎮 趣味：{person['hobby']}"
+                )
+
+                st.button(
+                    "💬 チャットする",
+                    key=f"chat_{person['id']}"
+                )
+
+
+except Exception as e:
+
+    st.error(
+        "マッチ情報を読み込めませんでした。"
+    )
+
+    st.code(str(e))
