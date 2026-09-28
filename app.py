@@ -358,7 +358,7 @@ if my_profile is None:
         "まずはあなたの情報を登録してください。"
     )
 
-        with st.form("profile_form"):
+    with st.form("profile_form"):
 
         name = st.text_input(
             "名前"
@@ -453,7 +453,6 @@ if my_profile is None:
             type="primary"
         )
 
-
     if submit_profile:
 
         if not name:
@@ -467,16 +466,16 @@ if my_profile is None:
             try:
 
                 data = {
-    "auth_id": user_id,
-    "name": name,
-    "grade": grade,
-    "department": department,
-    "purpose": ", ".join(purpose),
-    "strength": ", ".join(strength),
-    "weakness": ", ".join(weakness),
-    "hobby": ", ".join(hobby),
-    "introduction": introduction
-}
+                    "auth_id": user_id,
+                    "name": name,
+                    "grade": grade,
+                    "department": department,
+                    "purpose": ", ".join(purpose),
+                    "strength": ", ".join(strength),
+                    "weakness": ", ".join(weakness),
+                    "hobby": ", ".join(hobby),
+                    "introduction": introduction
+                }
 
                 supabase.table(
                     "profiles"
@@ -497,8 +496,6 @@ if my_profile is None:
                 st.code(str(e))
 
     st.stop()
-
-
 # =========================================================
 # メイン画面
 # =========================================================
