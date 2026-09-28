@@ -484,6 +484,7 @@ tab_match, tab_profile, tab_experience = st.tabs(
     [
         "🐝 マッチング",
         "👤 マイプロフィール",
+        "💬 チャット",
         "⭐ 交流経験"
     ]
 )
