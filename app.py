@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import random
+import extra_streamlit_components as stx
 from supabase import create_client
-
 
 # =========================================================
 # ページ設定
