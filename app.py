@@ -1154,7 +1154,7 @@ with tab_experience:
                     )
 
                     st.code(str(e))
-                    # =========================================================
+                   # =========================================================
 # チャット
 # =========================================================
 
@@ -1166,112 +1166,117 @@ with tab_chat:
         "マッチした相手と1対1でメッセージを送ることができます。"
     )
 
-    # -----------------------------------------------------
-    # 自分のマッチ一覧を取得
-    # -----------------------------------------------------
+    @st.fragment(run_every="3s")
+    def chat_fragment():
 
-    try:
-
-        matches1 = (
-            supabase
-            .table("matches")
-            .select("*")
-            .eq(
-                "user1_id",
-                my_profile["id"]
-            )
-            .execute()
-        )
-
-        matches2 = (
-            supabase
-            .table("matches")
-            .select("*")
-            .eq(
-                "user2_id",
-                my_profile["id"]
-            )
-            .execute()
-        )
-
-        my_matches = (
-            (matches1.data or [])
-            + (matches2.data or [])
-        )
-
-    except Exception as e:
-
-        st.error(
-            "マッチ情報を取得できませんでした。"
-        )
-
-        st.code(str(e))
-
-        my_matches = []
-
-
-    # -----------------------------------------------------
-    # マッチした相手を取得
-    # -----------------------------------------------------
-
-    chat_partners = []
-
-    for match in my_matches:
-
-        if match["user1_id"] == my_profile["id"]:
-
-            partner_id = match["user2_id"]
-
-        else:
-
-            partner_id = match["user1_id"]
-
+        # -------------------------------------------------
+        # 自分のマッチ一覧を取得
+        # -------------------------------------------------
 
         try:
 
-            partner_response = (
+            matches1 = (
                 supabase
-                .table("profiles")
+                .table("matches")
                 .select("*")
                 .eq(
-                    "id",
-                    partner_id
+                    "user1_id",
+                    my_profile["id"]
                 )
-                .single()
                 .execute()
             )
 
-            partner = partner_response.data
+            matches2 = (
+                supabase
+                .table("matches")
+                .select("*")
+                .eq(
+                    "user2_id",
+                    my_profile["id"]
+                )
+                .execute()
+            )
 
-            if partner:
+            my_matches = (
+                (matches1.data or [])
+                + (matches2.data or [])
+            )
 
-                chat_partners.append(partner)
+        except Exception as e:
 
-        except Exception:
+            st.error(
+                "マッチ情報を取得できませんでした。"
+            )
 
-            pass
+            st.code(str(e))
 
-
-    # -----------------------------------------------------
-    # マッチ相手がいない場合
-    # -----------------------------------------------------
-
-    if not chat_partners:
-
-        st.info(
-            "まだマッチした相手がいません。"
-        )
-
-        st.write(
-            "🐝 マッチング画面から気になる学生とつながってみましょう！"
-        )
+            my_matches = []
 
 
-    # -----------------------------------------------------
-    # チャット相手を選択
-    # -----------------------------------------------------
+        # -------------------------------------------------
+        # マッチした相手を取得
+        # -------------------------------------------------
 
-    else:
+        chat_partners = []
+
+        for match in my_matches:
+
+            if match["user1_id"] == my_profile["id"]:
+
+                partner_id = match["user2_id"]
+
+            else:
+
+                partner_id = match["user1_id"]
+
+
+            try:
+
+                partner_response = (
+                    supabase
+                    .table("profiles")
+                    .select("*")
+                    .eq(
+                        "id",
+                        partner_id
+                    )
+                    .single()
+                    .execute()
+                )
+
+                partner = partner_response.data
+
+                if partner:
+
+                    chat_partners.append(
+                        partner
+                    )
+
+            except Exception:
+
+                pass
+
+
+        # -------------------------------------------------
+        # マッチ相手がいない
+        # -------------------------------------------------
+
+        if not chat_partners:
+
+            st.info(
+                "まだマッチした相手がいません。"
+            )
+
+            st.write(
+                "🐝 マッチング画面から気になる学生とつながってみましょう！"
+            )
+
+            return
+
+
+        # -------------------------------------------------
+        # チャット相手
+        # -------------------------------------------------
 
         partner_names = [
             partner["name"]
@@ -1280,7 +1285,8 @@ with tab_chat:
 
         selected_name = st.selectbox(
             "💬 チャットする相手",
-            partner_names
+            partner_names,
+            key="chat_partner_select"
         )
 
 
@@ -1346,14 +1352,13 @@ with tab_chat:
             )
 
 
-            # 送信・受信をまとめる
             all_messages = (
                 sent_messages
                 + received_messages
             )
 
 
-            # 時系列順に並べる
+            # 時系列順
             all_messages.sort(
                 key=lambda x: x["created_at"]
             )
@@ -1381,7 +1386,8 @@ with tab_chat:
             )
 
             st.write(
-                f"{selected_partner['name']}さんに最初のメッセージを送ってみましょう！"
+                f"{selected_partner['name']}さんに"
+                "最初のメッセージを送ってみましょう！"
             )
 
 
@@ -1389,9 +1395,11 @@ with tab_chat:
 
             for message in all_messages:
 
-                if message["sender_id"] == my_profile["id"]:
+                if (
+                    message["sender_id"]
+                    == my_profile["id"]
+                ):
 
-                    # 自分のメッセージ
                     with st.chat_message("user"):
 
                         st.write(
@@ -1400,7 +1408,6 @@ with tab_chat:
 
                 else:
 
-                    # 相手のメッセージ
                     with st.chat_message("assistant"):
 
                         st.write(
@@ -1436,8 +1443,8 @@ with tab_chat:
                         }
                     ).execute()
 
-
-                    st.rerun()
+                    # 送信直後にチャット部分を更新
+                    st.rerun(scope="fragment")
 
 
                 except Exception as e:
@@ -1447,3 +1454,7 @@ with tab_chat:
                     )
 
                     st.code(str(e))
+
+
+    # チャットを表示
+    chat_fragment()
