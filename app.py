@@ -141,72 +141,76 @@ def login_page():
 
                     session = response.session
 
-                    if session:
+                   if session:
 
-    st.session_state.access_token = (
-        session.access_token
-    )
+                   st.session_state.access_token = (
+                   session.access_token
+                   )
 
-    st.session_state.refresh_token = (
-        session.refresh_token
-    )
+                   st.session_state.refresh_token = (
+                   session.refresh_token
+                   )
 
-    cookie_manager.set(
-        "campushive_access_token",
-        session.access_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
+                   cookie_manager.set(
+                   "campushive_access_token",
+                    session.access_token,
+                    max_age=60 * 60 * 24 * 30,
+                    secure=True,
+                    same_site="lax"
+                    )
 
-    cookie_manager.set(
-        "campushive_refresh_token",
-        session.refresh_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
+                   cookie_manager.set(
+                    "campushive_refresh_token",
+                    session.refresh_token,
+                    max_age=60 * 60 * 24 * 30,
+                    secure=True,
+                    same_site="lax"
+                    ) 
 
-    st.success(
-        "ログインしました！"
-    )
-
-    st.rerun()
-
-else:
-
-    st.error(
-        "ログインセッションを取得できませんでした。"
-    )
-
-    st.session_state.refresh_token = (
-        session.refresh_token
-    )
-
-    # ブラウザCookieに保存
-    cookie_manager.set(
-        "campushive_access_token",
-        session.access_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
-
-    cookie_manager.set(
-        "campushive_refresh_token",
-        session.refresh_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
-
-    st.success(
-        "ログインしました！"
-    )
-
-    st.rerun()
+                    st.success(
+                        "ログインしました！"
+                    )
+                
+                    st.rerun()
 
                     else:
+                    
+                        st.error(
+                            "ログインセッションを取得できませんでした。"
+                        )
+                    
+                        st.error(
+                            "ログインセッションを取得できませんでした。"
+                        )
+                    
+                        st.session_state.refresh_token = (
+                            session.refresh_token
+                        )
+                    
+                        # ブラウザCookieに保存
+                        cookie_manager.set(
+                            "campushive_access_token",
+                            session.access_token,
+                            max_age=60 * 60 * 24 * 30,
+                            secure=True,
+                            same_site="lax"
+                        )
+                    
+                        cookie_manager.set(
+                            "campushive_refresh_token",
+                            session.refresh_token,
+                            max_age=60 * 60 * 24 * 30,
+                            secure=True,
+                            same_site="lax"
+                        )
+                    
+                        st.success(
+                            "ログインしました！"
+                        )
+                    
+                        st.rerun()
+                    
+                                        else:
 
                         st.error(
                             "ログインセッションを取得できませんでした。"
