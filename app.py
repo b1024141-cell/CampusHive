@@ -1,24 +1,26 @@
 import streamlit as st
-from supabase import create_client, Client
+import pandas as pd
 import random
+from supabase import create_client
 
-# =========================
+
+# =========================================================
 # ページ設定
-# =========================
+# =========================================================
 
 st.set_page_config(
-    page_title="Campus Hive",
+    page_title="CampusHive",
     page_icon="🐝",
-    layout="centered"
+    layout="wide"
 )
 
 
-# =========================
+# =========================================================
 # Supabase接続
-# =========================
+# =========================================================
 
 @st.cache_resource
-def init_connection() -> Client:
+def init_connection():
 
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
@@ -28,970 +30,1030 @@ def init_connection() -> Client:
 
 supabase = init_connection()
 
-# =========================
-# ログイン状態
-# =========================
 
-session = supabase.auth.get_session()
+# =========================================================
+# セッション管理
+# =========================================================
 
-if session is None:
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
 
-    st.title("🐝 Campus Hive")
+if "refresh_token" not in st.session_state:
+    st.session_state.refresh_token = None
 
-    st.header("🔐 ログイン")
 
-    login_email = st.text_input(
-        "メールアドレス"
+# =========================================================
+# ログイン画面
+# =========================================================
+
+def login_page():
+
+    st.title("🐝 CampusHive")
+
+    st.subheader("大学生のための新しいマッチング")
+
+    st.write(
+        "あなたを「蜂」、他の学生を「花」として、"
+        "交流経験を次の出会いに活かします。"
     )
-
-    login_password = st.text_input(
-        "パスワード",
-        type="password"
-    )
-
-    if st.button("ログイン"):
-
-        try:
-
-            response = supabase.auth.sign_in_with_password({
-                "email": login_email,
-                "password": login_password
-            })
-
-            st.success("ログインしました！")
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                "ログインに失敗しました。"
-            )
-
-            st.code(str(e))
-
 
     st.divider()
 
-    st.header("🆕 新規登録")
-
-    signup_email = st.text_input(
-        "登録用メールアドレス"
-    )
-
-    signup_password = st.text_input(
-        "登録用パスワード",
-        type="password"
+    tab1, tab2 = st.tabs(
+        ["🔐 ログイン", "🆕 新規登録"]
     )
 
 
-    if st.button("アカウントを作成"):
+    # -----------------------------------------------------
+    # ログイン
+    # -----------------------------------------------------
 
-        try:
+    with tab1:
 
-            response = supabase.auth.sign_up({
-                "email": signup_email,
-                "password": signup_password
-            })
+        st.subheader("ログイン")
 
-            st.success(
-                "アカウントを作成しました！"
+        with st.form("login_form"):
+
+            email = st.text_input(
+                "メールアドレス"
             )
 
-            st.info(
-                "ログインしてください。"
+            password = st.text_input(
+                "パスワード",
+                type="password"
             )
 
-        except Exception as e:
-
-            st.error(
-                "アカウント作成に失敗しました。"
+            login_button = st.form_submit_button(
+                "ログイン",
+                type="primary"
             )
 
-            st.code(str(e))
 
+        if login_button:
+
+            if not email or not password:
+
+                st.error(
+                    "メールアドレスとパスワードを入力してください。"
+                )
+
+            else:
+
+                try:
+
+                    response = supabase.auth.sign_in_with_password(
+                        {
+                            "email": email,
+                            "password": password
+                        }
+                    )
+
+                    session = response.session
+
+                    if session:
+
+                        st.session_state.access_token = (
+                            session.access_token
+                        )
+
+                        st.session_state.refresh_token = (
+                            session.refresh_token
+                        )
+
+                        st.success(
+                            "ログインしました！"
+                        )
+
+                        st.rerun()
+
+                    else:
+
+                        st.error(
+                            "ログインセッションを取得できませんでした。"
+                        )
+
+                except Exception as e:
+
+                    st.error(
+                        "ログインに失敗しました。"
+                    )
+
+                    st.caption(str(e))
+
+
+    # -----------------------------------------------------
+    # 新規登録
+    # -----------------------------------------------------
+
+    with tab2:
+
+        st.subheader("新規登録")
+
+        with st.form("signup_form"):
+
+            signup_email = st.text_input(
+                "メールアドレス",
+                key="signup_email"
+            )
+
+            signup_password = st.text_input(
+                "パスワード",
+                type="password",
+                key="signup_password"
+            )
+
+            signup_password2 = st.text_input(
+                "パスワード（確認）",
+                type="password",
+                key="signup_password2"
+            )
+
+            signup_button = st.form_submit_button(
+                "アカウントを作成"
+            )
+
+
+        if signup_button:
+
+            if not signup_email or not signup_password:
+
+                st.error(
+                    "メールアドレスとパスワードを入力してください。"
+                )
+
+            elif signup_password != signup_password2:
+
+                st.error(
+                    "パスワードが一致していません。"
+                )
+
+            elif len(signup_password) < 6:
+
+                st.error(
+                    "パスワードは6文字以上にしてください。"
+                )
+
+            else:
+
+                try:
+
+                    response = supabase.auth.sign_up(
+                        {
+                            "email": signup_email,
+                            "password": signup_password
+                        }
+                    )
+
+                    # Confirm emailがOFFの場合
+                    if response.session:
+
+                        st.session_state.access_token = (
+                            response.session.access_token
+                        )
+
+                        st.session_state.refresh_token = (
+                            response.session.refresh_token
+                        )
+
+                        st.success(
+                            "アカウントを作成しました！"
+                        )
+
+                        st.rerun()
+
+                    else:
+
+                        st.success(
+                            "アカウントを作成しました！"
+                        )
+
+                        st.info(
+                            "確認メールが届いている場合は、"
+                            "メールアドレスを確認してからログインしてください。"
+                        )
+
+                except Exception as e:
+
+                    st.error(
+                        "アカウント作成に失敗しました。"
+                    )
+
+                    st.caption(str(e))
+
+
+# =========================================================
+# セッションをSupabaseに設定
+# =========================================================
+
+if (
+    st.session_state.access_token
+    and st.session_state.refresh_token
+):
+
+    try:
+
+        supabase.auth.set_session(
+            st.session_state.access_token,
+            st.session_state.refresh_token
+        )
+
+    except Exception:
+
+        st.session_state.access_token = None
+        st.session_state.refresh_token = None
+
+
+# =========================================================
+# 現在のユーザー取得
+# =========================================================
+
+try:
+
+    user_response = supabase.auth.get_user()
+
+    user = user_response.user
+
+except Exception:
+
+    user = None
+
+
+# =========================================================
+# ログインしていなければログイン画面
+# =========================================================
+
+if user is None:
+
+    login_page()
 
     st.stop()
-# =========================
-# タイトル
-# =========================
 
-st.title("🐝 Campus Hive")
+
+user_id = user.id
+
+
+# =========================================================
+# 自分のプロフィール取得
+# =========================================================
+
+try:
+
+    my_profile_response = (
+        supabase
+        .table("profiles")
+        .select("*")
+        .eq("auth_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+
+    my_profile = my_profile_response.data
+
+except Exception:
+
+    my_profile = None
+
+
+# =========================================================
+# サイドバー
+# =========================================================
+
+with st.sidebar:
+
+    st.title("🐝 CampusHive")
+
+    st.write(
+        f"ログイン中：{user.email}"
+    )
+
+    st.divider()
+
+    if st.button(
+        "🚪 ログアウト",
+        use_container_width=True
+    ):
+
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+
+        st.session_state.access_token = None
+        st.session_state.refresh_token = None
+
+        st.rerun()
+
+
+# =========================================================
+# プロフィール未登録の場合
+# =========================================================
+
+if my_profile is None:
+
+    st.title("🐝 CampusHive")
+
+    st.header("🌸 プロフィールを登録")
+
+    st.write(
+        "まずはあなたの情報を登録してください。"
+    )
+
+    with st.form("profile_form"):
+
+        name = st.text_input(
+            "名前"
+        )
+
+        grade = st.selectbox(
+            "学年",
+            [
+                "1年",
+                "2年",
+                "3年",
+                "4年",
+                "大学院生"
+            ]
+        )
+
+        department = st.text_input(
+            "学部・学科"
+        )
+
+        purpose = st.multiselect(
+            "CampusHiveを使う目的",
+            [
+                "友達探し",
+                "勉強仲間探し",
+                "プロジェクト仲間探し",
+                "趣味仲間探し",
+                "ゲーム仲間探し",
+                "旅行仲間探し",
+                "就活仲間探し"
+            ]
+        )
+
+        strength = st.text_input(
+            "得意なこと"
+        )
+
+        weakness = st.text_input(
+            "苦手・勉強したいこと"
+        )
+
+        hobby = st.text_input(
+            "趣味"
+        )
+
+        introduction = st.text_area(
+            "自己紹介"
+        )
+
+        submit_profile = st.form_submit_button(
+            "プロフィールを登録",
+            type="primary"
+        )
+
+
+    if submit_profile:
+
+        if not name:
+
+            st.error(
+                "名前を入力してください。"
+            )
+
+        else:
+
+            try:
+
+                data = {
+                    "auth_id": user_id,
+                    "name": name,
+                    "grade": grade,
+                    "department": department,
+                    "purpose": ", ".join(purpose),
+                    "strength": strength,
+                    "weakness": weakness,
+                    "hobby": hobby,
+                    "introduction": introduction
+                }
+
+                supabase.table(
+                    "profiles"
+                ).insert(data).execute()
+
+                st.success(
+                    "プロフィールを登録しました！"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    "プロフィール登録に失敗しました。"
+                )
+
+                st.code(str(e))
+
+    st.stop()
+
+
+# =========================================================
+# メイン画面
+# =========================================================
+
+st.title("🐝 CampusHive")
 
 st.write(
-    "蜂の群知能を利用した大学生向けマッチングアプリ"
+    f"こんにちは、{my_profile['name']}さん！"
+)
+
+st.write(
+    "あなたは🐝、他の学生は🌸です。"
 )
 
 st.divider()
 
 
-# ==================================================
-# プロフィール登録
-# ==================================================
+# =========================================================
+# タブ
+# =========================================================
 
-st.header("🌸 プロフィールを登録")
-
-
-with st.form("profile_form"):
-
-    name = st.text_input(
-        "名前・ニックネーム",
-        placeholder="例：あずみ"
-    )
-
-    grade = st.selectbox(
-        "学年",
-        [
-            "1年",
-            "2年",
-            "3年",
-            "4年",
-            "大学院生"
-        ]
-    )
-
-    department = st.text_input(
-        "学科",
-        placeholder="例：複雑系知能学科"
-    )
-
-    purpose = st.multiselect(
-        "探したい相手",
-        [
-            "友達",
-            "勉強仲間",
-            "プロジェクト仲間",
-            "ゲーム仲間",
-            "旅行仲間",
-            "趣味仲間",
-            "就活仲間"
-        ]
-    )
-
-    strength = st.text_input(
-        "得意なこと",
-        placeholder="例：Python、数学、AI"
-    )
-
-    weakness = st.text_input(
-        "苦手・教えてほしいこと",
-        placeholder="例：英語、プレゼン"
-    )
-
-    hobby = st.text_input(
-        "趣味",
-        placeholder="例：ゲーム、旅行、カフェ巡り"
-    )
-
-    introduction = st.text_area(
-        "自己紹介",
-        placeholder="自分について自由に書いてください"
-    )
-
-    submitted = st.form_submit_button(
-        "🐝 プロフィールを登録する"
-    )
+tab_match, tab_profile, tab_experience = st.tabs(
+    [
+        "🐝 マッチング",
+        "👤 マイプロフィール",
+        "⭐ 交流経験"
+    ]
+)
 
 
-# =========================
-# プロフィール登録処理
-# =========================
-
-if submitted:
-
-    if name.strip() == "":
-
-        st.warning(
-            "名前・ニックネームを入力してください。"
-        )
-
-    elif len(purpose) == 0:
-
-        st.warning(
-            "探したい相手を1つ以上選択してください。"
-        )
-
-    else:
-
-        try:
-
-            supabase.table("profiles").insert({
-
-                "name": name,
-                "grade": grade,
-                "department": department,
-                "purpose": ", ".join(purpose),
-                "strength": strength,
-                "weakness": weakness,
-                "hobby": hobby,
-                "introduction": introduction
-
-            }).execute()
-
-            st.success(
-                f"🐝 {name}さんのプロフィールを登録しました！"
-            )
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                "プロフィールの登録に失敗しました。"
-            )
-
-            st.code(str(e))
-
-
-st.divider()
-
-
-# ==================================================
-# プロフィール取得
-# ==================================================
-
-st.header("🐝 探索")
-
+# =========================================================
+# 全プロフィール取得
+# =========================================================
 
 try:
 
-    response = (
+    profiles_response = (
         supabase
         .table("profiles")
         .select("*")
-        .order("created_at", desc=True)
+        .neq("id", my_profile["id"])
         .execute()
     )
 
-    profiles = response.data
+    profiles = profiles_response.data or []
 
 except Exception as e:
 
     st.error(
-        "プロフィールを読み込めませんでした。"
+        "プロフィール情報を取得できませんでした。"
     )
-
-    st.code(str(e))
 
     profiles = []
 
 
-# ==================================================
-# 探索機能
-# ==================================================
+# =========================================================
+# 経験データ取得
+# =========================================================
 
-if len(profiles) >= 2:
+try:
 
-    st.write(
-        "あなたのプロフィールを選択して、"
-        "他のメンバーを探索してみましょう。"
+    experiences_response = (
+        supabase
+        .table("experiences")
+        .select("*")
+        .execute()
     )
 
+    experiences = experiences_response.data or []
 
-    # -------------------------
-    # 自分を選択
-    # -------------------------
+except Exception:
 
-    profile_names = [
-        person["name"]
-        for person in profiles
-    ]
+    experiences = []
 
 
-    my_name = st.selectbox(
-        "🐝 あなたは誰ですか？",
-        profile_names
-    )
+# =========================================================
+# マッチング
+# =========================================================
 
+with tab_match:
 
-    my_profile = next(
-        person
-        for person in profiles
-        if person["name"] == my_name
-    )
+    st.header("🌸 あなたにおすすめの学生")
 
+    if not profiles:
 
-    # -------------------------
-    # 探索候補
-    # -------------------------
-
-    candidates = [
-
-        person
-        for person in profiles
-        if person["id"] != my_profile["id"]
-
-    ]
-
-
-    # ==================================================
-    # 群れの経験データ取得
-    # ==================================================
-
-    try:
-
-        experience_response = (
-            supabase
-            .table("experiences")
-            .select("*")
-            .execute()
+        st.info(
+            "まだ他の学生が登録されていません。"
         )
 
-        experiences = experience_response.data
+    else:
 
-    except Exception as e:
+        # -------------------------------------------------
+        # 群れ全体の評価を計算
+        # -------------------------------------------------
 
-        st.error(
-            "交流データを読み込めませんでした。"
-        )
+        swarm_scores = {}
 
-        st.code(str(e))
+        for experience in experiences:
 
-        experiences = []
+            flower_id = experience.get(
+                "flower_id"
+            )
 
+            satisfaction = experience.get(
+                "satisfaction"
+            )
 
-    # ==================================================
-    # 群れスコア計算
-    # ==================================================
+            if flower_id is None:
+                continue
 
-    swarm_scores = {}
+            if flower_id not in swarm_scores:
 
+                swarm_scores[flower_id] = []
 
-    for person in candidates:
-
-        # この人に対する過去の評価
-        person_experiences = [
-
-            experience
-            for experience in experiences
-
-            if experience["flower_id"] == person["id"]
-
-        ]
+            swarm_scores[flower_id].append(
+                satisfaction
+            )
 
 
-        # 評価が存在する場合
-        if len(person_experiences) > 0:
+        swarm_average = {}
 
-            average = (
+        for flower_id, scores in swarm_scores.items():
 
-                sum(
-                    experience["satisfaction"]
-                    for experience in person_experiences
+            if scores:
+
+                swarm_average[flower_id] = (
+                    sum(scores) / len(scores)
                 )
 
-                / len(person_experiences)
 
-            )
+        # -------------------------------------------------
+        # 探索 / 活用
+        # -------------------------------------------------
 
-        # 評価がない場合
+        exploration_rate = 0.3
+
+        if random.random() < exploration_rate:
+
+            mode = "🔍 探索"
+
+            unexplored = [
+                p for p in profiles
+                if p["id"] not in swarm_average
+            ]
+
+            if unexplored:
+
+                candidate = random.choice(
+                    unexplored
+                )
+
+            else:
+
+                candidate = random.choice(
+                    profiles
+                )
+
         else:
 
-            average = 0
+            mode = "🧠 活用"
+
+            scored_profiles = [
+                p for p in profiles
+                if p["id"] in swarm_average
+            ]
+
+            if scored_profiles:
+
+                candidate = max(
+                    scored_profiles,
+                    key=lambda p:
+                        swarm_average[p["id"]]
+                )
+
+            else:
+
+                candidate = random.choice(
+                    profiles
+                )
 
 
-        swarm_scores[person["id"]] = average
+        # -------------------------------------------------
+        # 選ばれた学生
+        # -------------------------------------------------
 
-
-    # ==================================================
-    # 探索ボタン
-    # ==================================================
-
-    if st.button(
-        "🌼 群れの情報を使って探索する"
-    ):
-
-        # 評価された候補
-        evaluated_candidates = [
-
-            person
-            for person in candidates
-
-            if swarm_scores[person["id"]] > 0
-
-        ]
-
-
-        # 評価がある場合
-        if evaluated_candidates:
-
-            # 現在は最も評価が高い人を選ぶ
-            target = max(
-
-                evaluated_candidates,
-
-                key=lambda person:
-                swarm_scores[person["id"]]
-
-            )
-
-
-        # 評価がない場合
-        else:
-
-            # ランダム探索
-            target = random.choice(
-                candidates
-            )
-
-
-        st.session_state.target = target
-
-
-    # ==================================================
-    # 探索結果
-    # ==================================================
-
-    if "target" in st.session_state:
-
-        target = st.session_state.target
-
-
-        st.divider()
-
+        st.info(
+            f"今回の行動モード：{mode}"
+        )
 
         st.subheader(
-            f"🌸 {target['name']}さんを発見しました！"
+            "🌸 あなたが出会った候補"
         )
 
-
-        # -------------------------
-        # プロフィール表示
-        # -------------------------
-
-        st.write(
-            f"🎓 {target['grade']} / "
-            f"{target['department']}"
+        st.markdown(
+            f"## {candidate['name']}"
         )
 
+        col1, col2 = st.columns(2)
 
-        st.write(
-            f"🔎 探している相手："
-            f"{target['purpose']}"
-        )
-
-
-        if target["strength"]:
+        with col1:
 
             st.write(
-                f"💪 得意：{target['strength']}"
+                f"🎓 学年：{candidate.get('grade', '')}"
+            )
+
+            st.write(
+                f"🏫 学科：{candidate.get('department', '')}"
+            )
+
+            st.write(
+                f"🎯 目的：{candidate.get('purpose', '')}"
+            )
+
+        with col2:
+
+            st.write(
+                f"💪 得意：{candidate.get('strength', '')}"
+            )
+
+            st.write(
+                f"📚 苦手：{candidate.get('weakness', '')}"
+            )
+
+            st.write(
+                f"🎮 趣味：{candidate.get('hobby', '')}"
             )
 
 
-        if target["weakness"]:
+        if candidate.get("introduction"):
 
             st.write(
-                f"📚 教えてほしい："
-                f"{target['weakness']}"
+                "💬 自己紹介"
+            )
+
+            st.write(
+                candidate["introduction"]
             )
 
 
-        if target["hobby"]:
+        # -------------------------------------------------
+        # 群れの評価
+        # -------------------------------------------------
 
-            st.write(
-                f"🎮 趣味：{target['hobby']}"
-            )
+        if candidate["id"] in swarm_average:
 
+            score = swarm_average[
+                candidate["id"]
+            ]
 
-        if target["introduction"]:
-
-            st.write(
-                f"💬 {target['introduction']}"
-            )
-
-
-        # -------------------------
-        # 群れスコア
-        # -------------------------
-
-        score = swarm_scores[
-            target["id"]
-        ]
-
-
-        if score > 0:
-
-            st.info(
-                f"🐝 群れからの平均評価："
+            st.metric(
+                "🐝 群れの平均満足度",
                 f"{score:.1f} / 5"
             )
 
         else:
 
-            st.info(
-                "🐝 まだ群れからの評価はありません。"
+            st.caption(
+                "🐝 まだ群れの経験がありません。"
             )
 
 
         st.divider()
 
 
-        # ==================================================
-        # 交流評価
-        # ==================================================
+        # -------------------------------------------------
+        # マッチ申請
+        # -------------------------------------------------
 
         st.subheader(
-            "🍯 この人との交流を評価"
+            "🤝 この人とつながる"
         )
-
-
-        satisfaction = st.slider(
-            "満足度",
-            min_value=1,
-            max_value=5,
-            value=3
-        )
-
-
-        comment = st.text_area(
-            "感想（任意）",
-            placeholder=(
-                "例：Pythonについて話せて楽しかった！"
-            )
-        )
-
-
-        # -------------------------
-        # 評価保存
-        # -------------------------
 
         if st.button(
-            "🍯 評価を保存する"
+            "💛 マッチ申請する",
+            type="primary",
+            use_container_width=True
         ):
 
             try:
 
-                supabase.table(
-                    "experiences"
-                ).insert({
+                # 既に逆方向で登録されていないか確認
+                existing1 = (
+                    supabase
+                    .table("matches")
+                    .select("id")
+                    .eq(
+                        "user1_id",
+                        my_profile["id"]
+                    )
+                    .eq(
+                        "user2_id",
+                        candidate["id"]
+                    )
+                    .execute()
+                )
 
-                    "bee_id":
-                        my_profile["id"],
-
-                    "flower_id":
-                        target["id"],
-
-                    "satisfaction":
-                        satisfaction,
-
-                    "comment":
-                        comment
-
-                }).execute()
-
-
-                st.success(
-                    "🐝 交流経験を記録しました！"
+                existing2 = (
+                    supabase
+                    .table("matches")
+                    .select("id")
+                    .eq(
+                        "user1_id",
+                        candidate["id"]
+                    )
+                    .eq(
+                        "user2_id",
+                        my_profile["id"]
+                    )
+                    .execute()
                 )
 
 
-                st.rerun()
+                if existing1.data or existing2.data:
+
+                    st.info(
+                        "この人とはすでにマッチしています。"
+                    )
+
+                else:
+
+                    supabase.table(
+                        "matches"
+                    ).insert(
+                        {
+                            "user1_id": my_profile["id"],
+                            "user2_id": candidate["id"]
+                        }
+                    ).execute()
+
+                    st.success(
+                        f"{candidate['name']}さんにマッチ申請しました！"
+                    )
+
+                    st.rerun()
 
 
             except Exception as e:
 
                 st.error(
-                    "評価の保存に失敗しました。"
+                    "マッチ申請に失敗しました。"
                 )
 
                 st.code(str(e))
 
 
-else:
+        st.divider()
 
-    st.info(
-        "探索するには、2人以上のプロフィール登録が必要です。"
+
+        # -------------------------------------------------
+        # 他の学生一覧
+        # -------------------------------------------------
+
+        st.subheader(
+            "🌼 他の学生"
+        )
+
+        for profile in profiles:
+
+            if profile["id"] == candidate["id"]:
+                continue
+
+            with st.expander(
+                f"🌸 {profile['name']}"
+            ):
+
+                st.write(
+                    f"🎓 {profile.get('grade', '')}"
+                )
+
+                st.write(
+                    f"🏫 {profile.get('department', '')}"
+                )
+
+                st.write(
+                    f"🎯 {profile.get('purpose', '')}"
+                )
+
+                st.write(
+                    f"💪 得意：{profile.get('strength', '')}"
+                )
+
+                st.write(
+                    f"📚 苦手：{profile.get('weakness', '')}"
+                )
+
+                st.write(
+                    f"🎮 趣味：{profile.get('hobby', '')}"
+                )
+
+                st.write(
+                    profile.get('introduction', '')
+                )
+
+
+# =========================================================
+# マイプロフィール
+# =========================================================
+
+with tab_profile:
+
+    st.header("👤 マイプロフィール")
+
+    st.write(
+        f"**名前：** {my_profile['name']}"
+    )
+
+    st.write(
+        f"**学年：** {my_profile.get('grade', '')}"
+    )
+
+    st.write(
+        f"**学科：** {my_profile.get('department', '')}"
+    )
+
+    st.write(
+        f"**利用目的：** {my_profile.get('purpose', '')}"
+    )
+
+    st.write(
+        f"**得意：** {my_profile.get('strength', '')}"
+    )
+
+    st.write(
+        f"**苦手：** {my_profile.get('weakness', '')}"
+    )
+
+    st.write(
+        f"**趣味：** {my_profile.get('hobby', '')}"
+    )
+
+    st.write(
+        f"**自己紹介：** {my_profile.get('introduction', '')}"
     )
 
 
-st.divider()
+# =========================================================
+# 交流経験
+# =========================================================
+
+with tab_experience:
+
+    st.header("⭐ 交流経験を記録")
+
+    st.write(
+        "実際に交流した相手との経験を記録すると、"
+        "今後の🐝マッチングに活用できます。"
+    )
 
 
-# ==================================================
-# メンバー一覧
-# ==================================================
-
-st.header(
-    "🌼 Campus Hive のメンバー"
-)
-
-
-for person in profiles:
-
-    with st.container(
-        border=True
-    ):
-
-        st.subheader(
-            f"🌸 {person['name']}"
-        )
-
-
-        st.write(
-            f"🎓 {person['grade']} / "
-            f"{person['department']}"
-        )
-
-
-        st.write(
-            f"🔎 探している相手："
-            f"{person['purpose']}"
-        )
-
-
-        if person["strength"]:
-
-            st.write(
-                f"💪 得意："
-                f"{person['strength']}"
-            )
-
-
-        if person["weakness"]:
-
-            st.write(
-                f"📚 教えてほしい："
-                f"{person['weakness']}"
-            )
-
-
-        if person["hobby"]:
-
-            st.write(
-                f"🎮 趣味："
-                f"{person['hobby']}"
-            )
-
-
-        if person["introduction"]:
-
-            st.write(
-                f"💬 {person['introduction']}"
-            )
-            # ==================================================
-# マッチ機能
-# ==================================================
-
-st.subheader("💛 この人とつながる")
-
-
-if st.button("💛 マッチする"):
+    # -----------------------------------------------------
+    # マッチ一覧
+    # -----------------------------------------------------
 
     try:
 
-        # 自分と相手のID
-        my_id = my_profile["id"]
-        target_id = target["id"]
-
-        # IDの順番を統一
-        user1_id = min(my_id, target_id)
-        user2_id = max(my_id, target_id)
-
-        # すでにマッチしているか確認
-        existing_match = (
+        matches1 = (
             supabase
             .table("matches")
             .select("*")
-            .eq("user1_id", user1_id)
-            .eq("user2_id", user2_id)
+            .eq(
+                "user1_id",
+                my_profile["id"]
+            )
             .execute()
         )
 
-        if existing_match.data:
-
-            st.info(
-                "💛 すでにマッチしています！"
+        matches2 = (
+            supabase
+            .table("matches")
+            .select("*")
+            .eq(
+                "user2_id",
+                my_profile["id"]
             )
-
-        else:
-
-            # マッチを保存
-            supabase.table("matches").insert({
-
-                "user1_id": user1_id,
-                "user2_id": user2_id
-
-            }).execute()
-
-            st.success(
-                f"💕 {target['name']}さんとマッチしました！"
-            )
-
-            st.rerun()
-
-    except Exception as e:
-
-        st.error(
-            "マッチの保存に失敗しました。"
+            .execute()
         )
 
-        st.code(str(e))
-        # ==================================================
-# マッチした人一覧
-# ==================================================
-
-st.divider()
-
-st.header("💕 マッチした人")
-
-
-try:
-
-    match_response = (
-        supabase
-        .table("matches")
-        .select("*")
-        .execute()
-    )
-
-    matches = match_response.data
-
-
-    my_matches = []
-
-    for match in matches:
-
-        if match["user1_id"] == my_profile["id"]:
-
-            matched_id = match["user2_id"]
-
-        elif match["user2_id"] == my_profile["id"]:
-
-            matched_id = match["user1_id"]
-
-        else:
-
-            continue
-
-
-        matched_person = next(
-
-            (
-                person
-                for person in profiles
-                if person["id"] == matched_id
-            ),
-
-            None
-
+        my_matches = (
+            (matches1.data or [])
+            + (matches2.data or [])
         )
 
+    except Exception:
 
-        if matched_person:
-
-            my_matches.append(
-                matched_person
-            )
+        my_matches = []
 
 
-    # -------------------------
-    # マッチがない場合
-    # -------------------------
-
-    if len(my_matches) == 0:
+    if not my_matches:
 
         st.info(
-            "まだマッチした人はいません。"
+            "まだマッチした相手はいません。"
         )
-
-
-    # -------------------------
-    # マッチした人を表示
-    # -------------------------
 
     else:
 
-        for person in my_matches:
+        # 相手プロフィール取得
+        other_profiles = []
 
-            with st.container(
-                border=True
-            ):
+        for match in my_matches:
 
-                st.subheader(
-                    f"💕 {person['name']}"
-                )
+            if match["user1_id"] == my_profile["id"]:
 
-                st.write(
-                    f"🎓 {person['grade']} / "
-                    f"{person['department']}"
-                )
-
-                st.write(
-                    f"🎮 趣味：{person['hobby']}"
-                )
-
-                st.button(
-                    "💬 チャットする",
-                    key=f"chat_{person['id']}"
-                )
-
-
-except Exception as e:
-
-    st.error(
-        "マッチ情報を読み込めませんでした。"
-    )
-
-    st.code(str(e))
-# ==================================================
-# チャット
-# ==================================================
-
-st.divider()
-
-st.header("💬 チャット")
-
-
-# マッチした人がいる場合
-if len(my_matches) > 0:
-
-    # チャット相手を選択
-    chat_names = [
-        person["name"]
-        for person in my_matches
-    ]
-
-    chat_name = st.selectbox(
-        "チャットする相手",
-        chat_names
-    )
-
-    chat_partner = next(
-        person
-        for person in my_matches
-        if person["name"] == chat_name
-    )
-
-    st.subheader(
-        f"💬 {chat_partner['name']}さんとのチャット"
-    )
-
-
-    # ==================================================
-    # メッセージ取得
-    # ==================================================
-
-    try:
-
-        sent_messages = (
-            supabase
-            .table("messages")
-            .select("*")
-            .eq(
-                "sender_id",
-                my_profile["id"]
-            )
-            .eq(
-                "receiver_id",
-                chat_partner["id"]
-            )
-            .execute()
-        ).data
-
-
-        received_messages = (
-            supabase
-            .table("messages")
-            .select("*")
-            .eq(
-                "sender_id",
-                chat_partner["id"]
-            )
-            .eq(
-                "receiver_id",
-                my_profile["id"]
-            )
-            .execute()
-        ).data
-
-
-        messages = (
-            sent_messages +
-            received_messages
-        )
-
-
-        # 時間順に並べる
-        messages.sort(
-            key=lambda x: x["created_at"]
-        )
-
-
-        # ==================================================
-        # メッセージ表示
-        # ==================================================
-
-        for msg in messages:
-
-            if msg["sender_id"] == my_profile["id"]:
-
-                st.chat_message(
-                    "user"
-                ).write(
-                    msg["message"]
-                )
+                other_id = match["user2_id"]
 
             else:
 
-                st.chat_message(
-                    "assistant"
-                ).write(
-                    msg["message"]
+                other_id = match["user1_id"]
+
+
+            try:
+
+                response = (
+                    supabase
+                    .table("profiles")
+                    .select("*")
+                    .eq("id", other_id)
+                    .single()
+                    .execute()
                 )
 
+                if response.data:
 
-    except Exception as e:
+                    other_profiles.append(
+                        response.data
+                    )
 
-        st.error(
-            "メッセージを読み込めませんでした。"
-        )
+            except Exception:
 
-        st.code(str(e))
-
-
-    # ==================================================
-    # メッセージ送信
-    # ==================================================
-
-    message = st.chat_input(
-        f"{chat_partner['name']}さんにメッセージを送る"
-    )
+                pass
 
 
-    if message:
+        if other_profiles:
 
-        try:
-
-            supabase.table(
-                "messages"
-            ).insert({
-
-                "sender_id":
-                    my_profile["id"],
-
-                "receiver_id":
-                    chat_partner["id"],
-
-                "message":
-                    message
-
-            }).execute()
-
-
-            st.rerun()
-
-
-        except Exception as e:
-
-            st.error(
-                "メッセージを送信できませんでした。"
+            selected_name = st.selectbox(
+                "交流した相手",
+                [
+                    p["name"]
+                    for p in other_profiles
+                ]
             )
 
-            st.code(str(e))
+
+            selected_profile = next(
+                p for p in other_profiles
+                if p["name"] == selected_name
+            )
 
 
-else:
+            satisfaction = st.slider(
+                "満足度",
+                min_value=1,
+                max_value=5,
+                value=3
+            )
 
-    st.info(
-        "💛 まず誰かとマッチするとチャットできます。"
-    )
+
+            comment = st.text_area(
+                "交流についてのコメント",
+                placeholder="例：一緒に勉強できてよかった"
+            )
+
+
+            if st.button(
+                "⭐ 経験を記録",
+                type="primary"
+            ):
+
+                try:
+
+                    supabase.table(
+                        "experiences"
+                    ).insert(
+                        {
+                            "bee_id": my_profile["id"],
+                            "flower_id": selected_profile["id"],
+                            "satisfaction": satisfaction,
+                            "comment": comment
+                        }
+                    ).execute()
+
+                    st.success(
+                        "交流経験を記録しました！🐝"
+                    )
+
+                    st.info(
+                        "この経験は今後のマッチングに活用されます。"
+                    )
+
+                    st.rerun()
+
+
+                except Exception as e:
+
+                    st.error(
+                        "経験の記録に失敗しました。"
+                    )
+
+                    st.code(str(e))
