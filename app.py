@@ -585,3 +585,61 @@ for person in profiles:
             st.write(
                 f"💬 {person['introduction']}"
             )
+            # ==================================================
+# マッチ機能
+# ==================================================
+
+st.subheader("💛 この人とつながる")
+
+
+if st.button("💛 マッチする"):
+
+    try:
+
+        # 自分と相手のID
+        my_id = my_profile["id"]
+        target_id = target["id"]
+
+        # IDの順番を統一
+        user1_id = min(my_id, target_id)
+        user2_id = max(my_id, target_id)
+
+        # すでにマッチしているか確認
+        existing_match = (
+            supabase
+            .table("matches")
+            .select("*")
+            .eq("user1_id", user1_id)
+            .eq("user2_id", user2_id)
+            .execute()
+        )
+
+        if existing_match.data:
+
+            st.info(
+                "💛 すでにマッチしています！"
+            )
+
+        else:
+
+            # マッチを保存
+            supabase.table("matches").insert({
+
+                "user1_id": user1_id,
+                "user2_id": user2_id
+
+            }).execute()
+
+            st.success(
+                f"💕 {target['name']}さんとマッチしました！"
+            )
+
+            st.rerun()
+
+    except Exception as e:
+
+        st.error(
+            "マッチの保存に失敗しました。"
+        )
+
+        st.code(str(e))
