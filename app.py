@@ -750,3 +750,165 @@ except Exception as e:
     )
 
     st.code(str(e))
+# ==================================================
+# チャット
+# ==================================================
+
+st.divider()
+
+st.header("💬 チャット")
+
+
+# マッチした人がいる場合
+if len(my_matches) > 0:
+
+    # チャット相手を選択
+    chat_names = [
+        person["name"]
+        for person in my_matches
+    ]
+
+    chat_name = st.selectbox(
+        "チャットする相手",
+        chat_names
+    )
+
+    chat_partner = next(
+        person
+        for person in my_matches
+        if person["name"] == chat_name
+    )
+
+    st.subheader(
+        f"💬 {chat_partner['name']}さんとのチャット"
+    )
+
+
+    # ==================================================
+    # メッセージ取得
+    # ==================================================
+
+    try:
+
+        sent_messages = (
+            supabase
+            .table("messages")
+            .select("*")
+            .eq(
+                "sender_id",
+                my_profile["id"]
+            )
+            .eq(
+                "receiver_id",
+                chat_partner["id"]
+            )
+            .execute()
+        ).data
+
+
+        received_messages = (
+            supabase
+            .table("messages")
+            .select("*")
+            .eq(
+                "sender_id",
+                chat_partner["id"]
+            )
+            .eq(
+                "receiver_id",
+                my_profile["id"]
+            )
+            .execute()
+        ).data
+
+
+        messages = (
+            sent_messages +
+            received_messages
+        )
+
+
+        # 時間順に並べる
+        messages.sort(
+            key=lambda x: x["created_at"]
+        )
+
+
+        # ==================================================
+        # メッセージ表示
+        # ==================================================
+
+        for msg in messages:
+
+            if msg["sender_id"] == my_profile["id"]:
+
+                st.chat_message(
+                    "user"
+                ).write(
+                    msg["message"]
+                )
+
+            else:
+
+                st.chat_message(
+                    "assistant"
+                ).write(
+                    msg["message"]
+                )
+
+
+    except Exception as e:
+
+        st.error(
+            "メッセージを読み込めませんでした。"
+        )
+
+        st.code(str(e))
+
+
+    # ==================================================
+    # メッセージ送信
+    # ==================================================
+
+    message = st.chat_input(
+        f"{chat_partner['name']}さんにメッセージを送る"
+    )
+
+
+    if message:
+
+        try:
+
+            supabase.table(
+                "messages"
+            ).insert({
+
+                "sender_id":
+                    my_profile["id"],
+
+                "receiver_id":
+                    chat_partner["id"],
+
+                "message":
+                    message
+
+            }).execute()
+
+
+            st.rerun()
+
+
+        except Exception as e:
+
+            st.error(
+                "メッセージを送信できませんでした。"
+            )
+
+            st.code(str(e))
+
+
+else:
+
+    st.info(
+        "💛 まず誰かとマッチするとチャットできます。"
+    )
