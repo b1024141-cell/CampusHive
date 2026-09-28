@@ -4,7 +4,6 @@ import random
 import extra_streamlit_components as stx
 from supabase import create_client
 
-
 # =========================================================
 # ページ設定
 # =========================================================
@@ -15,7 +14,6 @@ st.set_page_config(
     layout="wide"
 )
 
-
 # =========================================================
 # Supabase接続
 # =========================================================
@@ -23,16 +21,17 @@ st.set_page_config(
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 
+# cache_resourceは使わない
+# ユーザーごとの認証状態が混ざるのを防ぐ
 supabase = create_client(url, key)
+
+# =========================================================
+# Cookie
+# =========================================================
 
 cookie_manager = stx.CookieManager(
     key="campushive_cookie_manager"
 )
-
-
-# =========================================================
-# セッション管理
-# =========================================================
 
 if "access_token" not in st.session_state:
     st.session_state.access_token = None
@@ -40,30 +39,46 @@ if "access_token" not in st.session_state:
 if "refresh_token" not in st.session_state:
     st.session_state.refresh_token = None
 
-
-# Cookieからログイン状態を復元
+# 保存済みセッションを読み込む
 if (
     st.session_state.access_token is None
     or st.session_state.refresh_token is None
 ):
-
     saved_access_token = cookie_manager.get(
         "campushive_access_token"
     )
-
     saved_refresh_token = cookie_manager.get(
         "campushive_refresh_token"
     )
 
     if saved_access_token and saved_refresh_token:
-
         st.session_state.access_token = saved_access_token
         st.session_state.refresh_token = saved_refresh_token
 
+# =========================================================
+# ログイン・新規登録
+# =========================================================
 
-# =========================================================
-# ログイン画面
-# =========================================================
+def save_session(session):
+    st.session_state.access_token = session.access_token
+    st.session_state.refresh_token = session.refresh_token
+
+    cookie_manager.set(
+        "campushive_access_token",
+        session.access_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
+
+    cookie_manager.set(
+        "campushive_refresh_token",
+        session.refresh_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
+
 
 def login_page():
 
@@ -82,7 +97,6 @@ def login_page():
         ["🔐 ログイン", "🆕 新規登録"]
     )
 
-
     # -----------------------------------------------------
     # ログイン
     # -----------------------------------------------------
@@ -93,9 +107,7 @@ def login_page():
 
         with st.form("login_form"):
 
-            email = st.text_input(
-                "メールアドレス"
-            )
+            email = st.text_input("メールアドレス")
 
             password = st.text_input(
                 "パスワード",
@@ -107,11 +119,9 @@ def login_page():
                 type="primary"
             )
 
-
         if login_button:
 
             if not email or not password:
-
                 st.error(
                     "メールアドレスとパスワードを入力してください。"
                 )
@@ -120,45 +130,22 @@ def login_page():
 
                 try:
 
-                    response = supabase.auth.sign_in_with_password(
-                        {
-                            "email": email,
-                            "password": password
-                        }
+                    response = (
+                        supabase.auth.sign_in_with_password(
+                            {
+                                "email": email,
+                                "password": password
+                            }
+                        )
                     )
 
                     session = response.session
 
                     if session:
 
-                        st.session_state.access_token = (
-                            session.access_token
-                        )
+                        save_session(session)
 
-                        st.session_state.refresh_token = (
-                            session.refresh_token
-                        )
-
-                        cookie_manager.set(
-                            "campushive_access_token",
-                            session.access_token,
-                            max_age=60 * 60 * 24 * 30,
-                            secure=True,
-                            same_site="lax"
-                        )
-
-                        cookie_manager.set(
-                            "campushive_refresh_token",
-                            session.refresh_token,
-                            max_age=60 * 60 * 24 * 30,
-                            secure=True,
-                            same_site="lax"
-                        )
-
-                        st.success(
-                            "ログインしました！"
-                        )
-
+                        st.success("ログインしました！")
                         st.rerun()
 
                     else:
@@ -169,12 +156,8 @@ def login_page():
 
                 except Exception as e:
 
-                    st.error(
-                        "ログインに失敗しました。"
-                    )
-
+                    st.error("ログインに失敗しました。")
                     st.caption(str(e))
-
 
     # -----------------------------------------------------
     # 新規登録
@@ -207,7 +190,6 @@ def login_page():
                 "アカウントを作成"
             )
 
-
         if signup_button:
 
             if not signup_email or not signup_password:
@@ -239,32 +221,9 @@ def login_page():
                         }
                     )
 
-                    # Confirm emailがOFFの場合
                     if response.session:
 
-                        st.session_state.access_token = (
-                            response.session.access_token
-                        )
-
-                        st.session_state.refresh_token = (
-                            response.session.refresh_token
-                        )
-
-                        cookie_manager.set(
-                            "campushive_access_token",
-                            response.session.access_token,
-                            max_age=60 * 60 * 24 * 30,
-                            secure=True,
-                            same_site="lax"
-                        )
-
-                        cookie_manager.set(
-                            "campushive_refresh_token",
-                            response.session.refresh_token,
-                            max_age=60 * 60 * 24 * 30,
-                            secure=True,
-                            same_site="lax"
-                        )
+                        save_session(response.session)
 
                         st.success(
                             "アカウントを作成しました！"
@@ -293,7 +252,7 @@ def login_page():
 
 
 # =========================================================
-# セッションをSupabaseに設定
+# Supabaseにセッションを設定
 # =========================================================
 
 if (
@@ -313,6 +272,16 @@ if (
         st.session_state.access_token = None
         st.session_state.refresh_token = None
 
+        try:
+            cookie_manager.delete(
+                "campushive_access_token"
+            )
+            cookie_manager.delete(
+                "campushive_refresh_token"
+            )
+        except Exception:
+            pass
+
 
 # =========================================================
 # 現在のユーザー取得
@@ -321,7 +290,6 @@ if (
 try:
 
     user_response = supabase.auth.get_user()
-
     user = user_response.user
 
 except Exception:
@@ -329,14 +297,9 @@ except Exception:
     user = None
 
 
-# =========================================================
-# ログインしていなければログイン画面
-# =========================================================
-
 if user is None:
 
     login_page()
-
     st.stop()
 
 
@@ -393,12 +356,78 @@ with st.sidebar:
         st.session_state.refresh_token = None
 
         try:
-            cookie_manager.delete("campushive_access_token")
-            cookie_manager.delete("campushive_refresh_token")
+            cookie_manager.delete(
+                "campushive_access_token"
+            )
+            cookie_manager.delete(
+                "campushive_refresh_token"
+            )
         except Exception:
             pass
 
         st.rerun()
+
+
+# =========================================================
+# 選択肢
+# =========================================================
+
+GRADE_OPTIONS = [
+    "1年",
+    "2年",
+    "3年",
+    "4年",
+    "大学院生"
+]
+
+PURPOSE_OPTIONS = [
+    "友達探し",
+    "勉強仲間探し",
+    "プロジェクト仲間探し",
+    "趣味仲間探し",
+    "ゲーム仲間探し",
+    "旅行仲間探し",
+    "就活仲間探し"
+]
+
+HOBBY_OPTIONS = [
+    "ゲーム",
+    "アニメ・漫画",
+    "音楽",
+    "映画・ドラマ",
+    "スポーツ",
+    "旅行",
+    "カフェ・グルメ",
+    "読書",
+    "ファッション",
+    "写真",
+    "プログラミング",
+    "その他"
+]
+
+SKILL_OPTIONS = [
+    "プログラミング",
+    "数学",
+    "英語",
+    "プレゼン",
+    "デザイン",
+    "文章作成",
+    "コミュニケーション",
+    "リーダーシップ",
+    "調査・情報収集",
+    "スポーツ",
+    "その他"
+]
+
+
+def split_values(value):
+    if not value:
+        return []
+    return [
+        x.strip()
+        for x in value.split(",")
+        if x.strip()
+    ]
 
 
 # =========================================================
@@ -417,19 +446,11 @@ if my_profile is None:
 
     with st.form("profile_form"):
 
-        name = st.text_input(
-            "名前"
-        )
+        name = st.text_input("名前")
 
         grade = st.selectbox(
             "学年",
-            [
-                "1年",
-                "2年",
-                "3年",
-                "4年",
-                "大学院生"
-            ]
+            GRADE_OPTIONS
         )
 
         department = st.text_input(
@@ -438,67 +459,22 @@ if my_profile is None:
 
         purpose = st.multiselect(
             "🎯 CampusHiveを使う目的",
-            [
-                "友達探し",
-                "勉強仲間探し",
-                "プロジェクト仲間探し",
-                "趣味仲間探し",
-                "ゲーム仲間探し",
-                "旅行仲間探し",
-                "就活仲間探し"
-            ]
+            PURPOSE_OPTIONS
         )
 
         hobby = st.multiselect(
             "🎮 趣味",
-            [
-                "ゲーム",
-                "アニメ・漫画",
-                "音楽",
-                "映画・ドラマ",
-                "スポーツ",
-                "旅行",
-                "カフェ・グルメ",
-                "読書",
-                "ファッション",
-                "写真",
-                "プログラミング",
-                "その他"
-            ]
+            HOBBY_OPTIONS
         )
 
         strength = st.multiselect(
             "💪 得意なこと",
-            [
-                "プログラミング",
-                "数学",
-                "英語",
-                "プレゼン",
-                "デザイン",
-                "文章作成",
-                "コミュニケーション",
-                "リーダーシップ",
-                "調査・情報収集",
-                "スポーツ",
-                "その他"
-            ]
+            SKILL_OPTIONS
         )
 
         weakness = st.multiselect(
             "📚 苦手・伸ばしたいこと",
-            [
-                "プログラミング",
-                "数学",
-                "英語",
-                "プレゼン",
-                "デザイン",
-                "文章作成",
-                "コミュニケーション",
-                "リーダーシップ",
-                "調査・情報収集",
-                "スポーツ",
-                "その他"
-            ]
+            SKILL_OPTIONS
         )
 
         introduction = st.text_area(
@@ -510,10 +486,9 @@ if my_profile is None:
             type="primary"
         )
 
-
     if submit_profile:
 
-        if not name:
+        if not name.strip():
 
             st.error(
                 "名前を入力してください。"
@@ -525,14 +500,14 @@ if my_profile is None:
 
                 data = {
                     "auth_id": user_id,
-                    "name": name,
+                    "name": name.strip(),
                     "grade": grade,
                     "department": department,
                     "purpose": ", ".join(purpose),
                     "strength": ", ".join(strength),
                     "weakness": ", ".join(weakness),
                     "hobby": ", ".join(hobby),
-                    "introduction": introduction
+                    "introduction": introduction.strip()
                 }
 
                 supabase.table(
@@ -585,6 +560,7 @@ tab_match, tab_chat, tab_profile, tab_experience = st.tabs(
         "⭐ 交流経験"
     ]
 )
+
 
 # =========================================================
 # 全プロフィール取得
@@ -648,7 +624,7 @@ with tab_match:
     else:
 
         # -------------------------------------------------
-        # 群れ全体の評価を計算
+        # 群れ全体の評価
         # -------------------------------------------------
 
         swarm_scores = {}
@@ -667,24 +643,21 @@ with tab_match:
                 continue
 
             if flower_id not in swarm_scores:
-
                 swarm_scores[flower_id] = []
 
-            swarm_scores[flower_id].append(
-                satisfaction
-            )
-
+            if satisfaction is not None:
+                swarm_scores[flower_id].append(
+                    satisfaction
+                )
 
         swarm_average = {}
 
         for flower_id, scores in swarm_scores.items():
 
             if scores:
-
                 swarm_average[flower_id] = (
                     sum(scores) / len(scores)
                 )
-
 
         # -------------------------------------------------
         # 探索 / 活用
@@ -702,13 +675,10 @@ with tab_match:
             ]
 
             if unexplored:
-
                 candidate = random.choice(
                     unexplored
                 )
-
             else:
-
                 candidate = random.choice(
                     profiles
                 )
@@ -736,9 +706,8 @@ with tab_match:
                     profiles
                 )
 
-
         # -------------------------------------------------
-        # 選ばれた学生
+        # 候補表示
         # -------------------------------------------------
 
         st.info(
@@ -783,21 +752,13 @@ with tab_match:
                 f"🎮 趣味：{candidate.get('hobby', '')}"
             )
 
-
         if candidate.get("introduction"):
 
-            st.write(
-                "💬 自己紹介"
-            )
+            st.write("💬 自己紹介")
 
             st.write(
                 candidate["introduction"]
             )
-
-
-        # -------------------------------------------------
-        # 群れの評価
-        # -------------------------------------------------
 
         if candidate["id"] in swarm_average:
 
@@ -816,9 +777,7 @@ with tab_match:
                 "🐝 まだ群れの経験がありません。"
             )
 
-
         st.divider()
-
 
         # -------------------------------------------------
         # マッチ申請
@@ -836,7 +795,6 @@ with tab_match:
 
             try:
 
-                # 既に逆方向で登録されていないか確認
                 existing1 = (
                     supabase
                     .table("matches")
@@ -867,7 +825,6 @@ with tab_match:
                     .execute()
                 )
 
-
                 if existing1.data or existing2.data:
 
                     st.info(
@@ -891,7 +848,6 @@ with tab_match:
 
                     st.rerun()
 
-
             except Exception as e:
 
                 st.error(
@@ -900,9 +856,7 @@ with tab_match:
 
                 st.code(str(e))
 
-
         st.divider()
-
 
         # -------------------------------------------------
         # 他の学生一覧
@@ -946,7 +900,10 @@ with tab_match:
                 )
 
                 st.write(
-                    profile.get('introduction', '')
+                    profile.get(
+                        "introduction",
+                        ""
+                    )
                 )
 
 
@@ -958,8 +915,12 @@ with tab_profile:
 
     st.header("👤 マイプロフィール")
 
+    # -----------------------------------------------------
+    # 表示
+    # -----------------------------------------------------
+
     st.write(
-        f"**名前：** {my_profile['name']}"
+        f"**名前：** {my_profile.get('name', '')}"
     )
 
     st.write(
@@ -987,8 +948,189 @@ with tab_profile:
     )
 
     st.write(
-        f"**自己紹介：** {my_profile.get('introduction', '')}"
+        f"**自己紹介：** "
+        f"{my_profile.get('introduction', '')}"
     )
+
+    st.divider()
+
+    # -----------------------------------------------------
+    # 編集
+    # -----------------------------------------------------
+
+    st.subheader("✏️ プロフィールを編集")
+
+    current_purpose = split_values(
+        my_profile.get("purpose", "")
+    )
+
+    current_hobby = split_values(
+        my_profile.get("hobby", "")
+    )
+
+    current_strength = split_values(
+        my_profile.get("strength", "")
+    )
+
+    current_weakness = split_values(
+        my_profile.get("weakness", "")
+    )
+
+    # selectbox / multiselect の初期値が
+    # 選択肢に存在するか確認
+    current_grade = my_profile.get(
+        "grade",
+        GRADE_OPTIONS[0]
+    )
+
+    if current_grade not in GRADE_OPTIONS:
+        current_grade = GRADE_OPTIONS[0]
+
+    current_purpose = [
+        x for x in current_purpose
+        if x in PURPOSE_OPTIONS
+    ]
+
+    current_hobby = [
+        x for x in current_hobby
+        if x in HOBBY_OPTIONS
+    ]
+
+    current_strength = [
+        x for x in current_strength
+        if x in SKILL_OPTIONS
+    ]
+
+    current_weakness = [
+        x for x in current_weakness
+        if x in SKILL_OPTIONS
+    ]
+
+    with st.form("edit_profile_form"):
+
+        edit_name = st.text_input(
+            "名前",
+            value=my_profile.get("name", "")
+        )
+
+        edit_grade = st.selectbox(
+            "学年",
+            GRADE_OPTIONS,
+            index=GRADE_OPTIONS.index(
+                current_grade
+            )
+        )
+
+        edit_department = st.text_input(
+            "学部・学科",
+            value=my_profile.get(
+                "department",
+                ""
+            )
+        )
+
+        edit_purpose = st.multiselect(
+            "🎯 CampusHiveを使う目的",
+            PURPOSE_OPTIONS,
+            default=current_purpose
+        )
+
+        edit_hobby = st.multiselect(
+            "🎮 趣味",
+            HOBBY_OPTIONS,
+            default=current_hobby
+        )
+
+        edit_strength = st.multiselect(
+            "💪 得意なこと",
+            SKILL_OPTIONS,
+            default=current_strength
+        )
+
+        edit_weakness = st.multiselect(
+            "📚 苦手・伸ばしたいこと",
+            SKILL_OPTIONS,
+            default=current_weakness
+        )
+
+        edit_introduction = st.text_area(
+            "自己紹介",
+            value=my_profile.get(
+                "introduction",
+                ""
+            )
+        )
+
+        save_profile = st.form_submit_button(
+            "💾 プロフィールを保存",
+            type="primary"
+        )
+
+    if save_profile:
+
+        if not edit_name.strip():
+
+            st.error(
+                "名前を入力してください。"
+            )
+
+        else:
+
+            try:
+
+                update_data = {
+                    "name": edit_name.strip(),
+                    "grade": edit_grade,
+                    "department": edit_department.strip(),
+                    "purpose": ", ".join(
+                        edit_purpose
+                    ),
+                    "strength": ", ".join(
+                        edit_strength
+                    ),
+                    "weakness": ", ".join(
+                        edit_weakness
+                    ),
+                    "hobby": ", ".join(
+                        edit_hobby
+                    ),
+                    "introduction": (
+                        edit_introduction.strip()
+                    )
+                }
+
+                (
+                    supabase
+                    .table("profiles")
+                    .update(update_data)
+                    .eq(
+                        "id",
+                        my_profile["id"]
+                    )
+                    .eq(
+                        "auth_id",
+                        user_id
+                    )
+                    .execute()
+                )
+
+                st.success(
+                    "プロフィールを更新しました！🐝"
+                )
+
+                st.info(
+                    "変更内容は次回のマッチングから反映されます。"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    "プロフィールの更新に失敗しました。"
+                )
+
+                st.code(str(e))
 
 
 # =========================================================
@@ -1003,11 +1145,6 @@ with tab_experience:
         "実際に交流した相手との経験を記録すると、"
         "今後の🐝マッチングに活用できます。"
     )
-
-
-    # -----------------------------------------------------
-    # マッチ一覧
-    # -----------------------------------------------------
 
     try:
 
@@ -1042,7 +1179,6 @@ with tab_experience:
 
         my_matches = []
 
-
     if not my_matches:
 
         st.info(
@@ -1051,19 +1187,14 @@ with tab_experience:
 
     else:
 
-        # 相手プロフィール取得
         other_profiles = []
 
         for match in my_matches:
 
             if match["user1_id"] == my_profile["id"]:
-
                 other_id = match["user2_id"]
-
             else:
-
                 other_id = match["user1_id"]
-
 
             try:
 
@@ -1071,21 +1202,21 @@ with tab_experience:
                     supabase
                     .table("profiles")
                     .select("*")
-                    .eq("id", other_id)
+                    .eq(
+                        "id",
+                        other_id
+                    )
                     .single()
                     .execute()
                 )
 
                 if response.data:
-
                     other_profiles.append(
                         response.data
                     )
 
             except Exception:
-
                 pass
-
 
         if other_profiles:
 
@@ -1097,12 +1228,10 @@ with tab_experience:
                 ]
             )
 
-
             selected_profile = next(
                 p for p in other_profiles
                 if p["name"] == selected_name
             )
-
 
             satisfaction = st.slider(
                 "満足度",
@@ -1111,12 +1240,10 @@ with tab_experience:
                 value=3
             )
 
-
             comment = st.text_area(
                 "交流についてのコメント",
                 placeholder="例：一緒に勉強できてよかった"
             )
-
 
             if st.button(
                 "⭐ 経験を記録",
@@ -1146,7 +1273,6 @@ with tab_experience:
 
                     st.rerun()
 
-
                 except Exception as e:
 
                     st.error(
@@ -1154,7 +1280,9 @@ with tab_experience:
                     )
 
                     st.code(str(e))
-                   # =========================================================
+
+
+# =========================================================
 # チャット
 # =========================================================
 
@@ -1168,10 +1296,6 @@ with tab_chat:
 
     @st.fragment(run_every="3s")
     def chat_fragment():
-
-        # -------------------------------------------------
-        # 自分のマッチ一覧を取得
-        # -------------------------------------------------
 
         try:
 
@@ -1209,26 +1333,16 @@ with tab_chat:
             )
 
             st.code(str(e))
-
             my_matches = []
-
-
-        # -------------------------------------------------
-        # マッチした相手を取得
-        # -------------------------------------------------
 
         chat_partners = []
 
         for match in my_matches:
 
             if match["user1_id"] == my_profile["id"]:
-
                 partner_id = match["user2_id"]
-
             else:
-
                 partner_id = match["user1_id"]
-
 
             try:
 
@@ -1247,19 +1361,10 @@ with tab_chat:
                 partner = partner_response.data
 
                 if partner:
-
-                    chat_partners.append(
-                        partner
-                    )
+                    chat_partners.append(partner)
 
             except Exception:
-
                 pass
-
-
-        # -------------------------------------------------
-        # マッチ相手がいない
-        # -------------------------------------------------
 
         if not chat_partners:
 
@@ -1273,11 +1378,6 @@ with tab_chat:
 
             return
 
-
-        # -------------------------------------------------
-        # チャット相手
-        # -------------------------------------------------
-
         partner_names = [
             partner["name"]
             for partner in chat_partners
@@ -1289,7 +1389,6 @@ with tab_chat:
             key="chat_partner_select"
         )
 
-
         selected_partner = next(
             partner
             for partner in chat_partners
@@ -1298,17 +1397,11 @@ with tab_chat:
 
         partner_id = selected_partner["id"]
 
-
         st.divider()
 
         st.subheader(
             f"🌸 {selected_partner['name']}さん"
         )
-
-
-        # -------------------------------------------------
-        # メッセージ取得
-        # -------------------------------------------------
 
         try:
 
@@ -1342,7 +1435,6 @@ with tab_chat:
                 .execute()
             )
 
-
             sent_messages = (
                 sent_messages_response.data or []
             )
@@ -1351,18 +1443,14 @@ with tab_chat:
                 received_messages_response.data or []
             )
 
-
             all_messages = (
                 sent_messages
                 + received_messages
             )
 
-
-            # 時系列順
             all_messages.sort(
                 key=lambda x: x["created_at"]
             )
-
 
         except Exception as e:
 
@@ -1371,13 +1459,7 @@ with tab_chat:
             )
 
             st.code(str(e))
-
             all_messages = []
-
-
-        # -------------------------------------------------
-        # メッセージ表示
-        # -------------------------------------------------
 
         if not all_messages:
 
@@ -1390,15 +1472,11 @@ with tab_chat:
                 "最初のメッセージを送ってみましょう！"
             )
 
-
         else:
 
             for message in all_messages:
 
-                if (
-                    message["sender_id"]
-                    == my_profile["id"]
-                ):
+                if message["sender_id"] == my_profile["id"]:
 
                     with st.chat_message("user"):
 
@@ -1414,20 +1492,13 @@ with tab_chat:
                             message["message"]
                         )
 
-
-        # -------------------------------------------------
-        # メッセージ送信
-        # -------------------------------------------------
-
         new_message = st.chat_input(
             f"{selected_partner['name']}さんにメッセージを送る"
         )
 
-
         if new_message:
 
             new_message = new_message.strip()
-
 
             if new_message:
 
@@ -1443,9 +1514,7 @@ with tab_chat:
                         }
                     ).execute()
 
-                    # 送信直後にチャット部分を更新
                     st.rerun(scope="fragment")
-
 
                 except Exception as e:
 
@@ -1455,6 +1524,4 @@ with tab_chat:
 
                     st.code(str(e))
 
-
-    # チャットを表示
     chat_fragment()
