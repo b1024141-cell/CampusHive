@@ -380,29 +380,69 @@ if my_profile is None:
         )
 
         purpose = st.multiselect(
-            "CampusHiveを使う目的",
-            [
-                "友達探し",
-                "勉強仲間探し",
-                "プロジェクト仲間探し",
-                "趣味仲間探し",
-                "ゲーム仲間探し",
-                "旅行仲間探し",
-                "就活仲間探し"
-            ]
-        )
+    "🎯 CampusHiveを使う目的",
+    [
+        "友達探し",
+        "勉強仲間探し",
+        "プロジェクト仲間探し",
+        "趣味仲間探し",
+        "ゲーム仲間探し",
+        "旅行仲間探し",
+        "就活仲間探し"
+    ]
+)
 
-        strength = st.text_input(
-            "得意なこと"
-        )
+hobby = st.multiselect(
+    "🎮 趣味",
+    [
+        "ゲーム",
+        "アニメ・漫画",
+        "音楽",
+        "映画・ドラマ",
+        "スポーツ",
+        "旅行",
+        "カフェ・グルメ",
+        "読書",
+        "ファッション",
+        "写真",
+        "プログラミング",
+        "その他"
+    ]
+)
 
-        weakness = st.text_input(
-            "苦手・勉強したいこと"
-        )
+strength = st.multiselect(
+    "💪 得意なこと",
+    [
+        "プログラミング",
+        "数学",
+        "英語",
+        "プレゼン",
+        "デザイン",
+        "文章作成",
+        "コミュニケーション",
+        "リーダーシップ",
+        "調査・情報収集",
+        "スポーツ",
+        "その他"
+    ]
+)
 
-        hobby = st.text_input(
-            "趣味"
-        )
+weakness = st.multiselect(
+    "📚 苦手・伸ばしたいこと",
+    [
+        "プログラミング",
+        "数学",
+        "英語",
+        "プレゼン",
+        "デザイン",
+        "文章作成",
+        "コミュニケーション",
+        "リーダーシップ",
+        "調査・情報収集",
+        "スポーツ",
+        "その他"
+    ]
+)
 
         introduction = st.text_area(
             "自己紹介"
@@ -427,16 +467,16 @@ if my_profile is None:
             try:
 
                 data = {
-                    "auth_id": user_id,
-                    "name": name,
-                    "grade": grade,
-                    "department": department,
-                    "purpose": ", ".join(purpose),
-                    "strength": strength,
-                    "weakness": weakness,
-                    "hobby": hobby,
-                    "introduction": introduction
-                }
+    "auth_id": user_id,
+    "name": name,
+    "grade": grade,
+    "department": department,
+    "purpose": ", ".join(purpose),
+    "strength": ", ".join(strength),
+    "weakness": ", ".join(weakness),
+    "hobby": ", ".join(hobby),
+    "introduction": introduction
+}
 
                 supabase.table(
                     "profiles"
