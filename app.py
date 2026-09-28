@@ -1058,3 +1058,296 @@ with tab_experience:
                     )
 
                     st.code(str(e))
+                    # =========================================================
+# チャット
+# =========================================================
+
+with tab_chat:
+
+    st.header("💬 チャット")
+
+    st.write(
+        "マッチした相手と1対1でメッセージを送ることができます。"
+    )
+
+    # -----------------------------------------------------
+    # 自分のマッチ一覧を取得
+    # -----------------------------------------------------
+
+    try:
+
+        matches1 = (
+            supabase
+            .table("matches")
+            .select("*")
+            .eq(
+                "user1_id",
+                my_profile["id"]
+            )
+            .execute()
+        )
+
+        matches2 = (
+            supabase
+            .table("matches")
+            .select("*")
+            .eq(
+                "user2_id",
+                my_profile["id"]
+            )
+            .execute()
+        )
+
+        my_matches = (
+            (matches1.data or [])
+            + (matches2.data or [])
+        )
+
+    except Exception as e:
+
+        st.error(
+            "マッチ情報を取得できませんでした。"
+        )
+
+        st.code(str(e))
+
+        my_matches = []
+
+
+    # -----------------------------------------------------
+    # マッチした相手を取得
+    # -----------------------------------------------------
+
+    chat_partners = []
+
+    for match in my_matches:
+
+        if match["user1_id"] == my_profile["id"]:
+
+            partner_id = match["user2_id"]
+
+        else:
+
+            partner_id = match["user1_id"]
+
+
+        try:
+
+            partner_response = (
+                supabase
+                .table("profiles")
+                .select("*")
+                .eq(
+                    "id",
+                    partner_id
+                )
+                .single()
+                .execute()
+            )
+
+            partner = partner_response.data
+
+            if partner:
+
+                chat_partners.append(partner)
+
+        except Exception:
+
+            pass
+
+
+    # -----------------------------------------------------
+    # マッチ相手がいない場合
+    # -----------------------------------------------------
+
+    if not chat_partners:
+
+        st.info(
+            "まだマッチした相手がいません。"
+        )
+
+        st.write(
+            "🐝 マッチング画面から気になる学生とつながってみましょう！"
+        )
+
+
+    # -----------------------------------------------------
+    # チャット相手を選択
+    # -----------------------------------------------------
+
+    else:
+
+        partner_names = [
+            partner["name"]
+            for partner in chat_partners
+        ]
+
+        selected_name = st.selectbox(
+            "💬 チャットする相手",
+            partner_names
+        )
+
+
+        selected_partner = next(
+            partner
+            for partner in chat_partners
+            if partner["name"] == selected_name
+        )
+
+        partner_id = selected_partner["id"]
+
+
+        st.divider()
+
+        st.subheader(
+            f"🌸 {selected_partner['name']}さん"
+        )
+
+
+        # -------------------------------------------------
+        # メッセージ取得
+        # -------------------------------------------------
+
+        try:
+
+            sent_messages_response = (
+                supabase
+                .table("messages")
+                .select("*")
+                .eq(
+                    "sender_id",
+                    my_profile["id"]
+                )
+                .eq(
+                    "receiver_id",
+                    partner_id
+                )
+                .execute()
+            )
+
+            received_messages_response = (
+                supabase
+                .table("messages")
+                .select("*")
+                .eq(
+                    "sender_id",
+                    partner_id
+                )
+                .eq(
+                    "receiver_id",
+                    my_profile["id"]
+                )
+                .execute()
+            )
+
+
+            sent_messages = (
+                sent_messages_response.data or []
+            )
+
+            received_messages = (
+                received_messages_response.data or []
+            )
+
+
+            # 送信・受信をまとめる
+            all_messages = (
+                sent_messages
+                + received_messages
+            )
+
+
+            # 時系列順に並べる
+            all_messages.sort(
+                key=lambda x: x["created_at"]
+            )
+
+
+        except Exception as e:
+
+            st.error(
+                "メッセージを取得できませんでした。"
+            )
+
+            st.code(str(e))
+
+            all_messages = []
+
+
+        # -------------------------------------------------
+        # メッセージ表示
+        # -------------------------------------------------
+
+        if not all_messages:
+
+            st.info(
+                "まだメッセージはありません。"
+            )
+
+            st.write(
+                f"{selected_partner['name']}さんに最初のメッセージを送ってみましょう！"
+            )
+
+
+        else:
+
+            for message in all_messages:
+
+                if message["sender_id"] == my_profile["id"]:
+
+                    # 自分のメッセージ
+                    with st.chat_message("user"):
+
+                        st.write(
+                            message["message"]
+                        )
+
+                else:
+
+                    # 相手のメッセージ
+                    with st.chat_message("assistant"):
+
+                        st.write(
+                            message["message"]
+                        )
+
+
+        # -------------------------------------------------
+        # メッセージ送信
+        # -------------------------------------------------
+
+        new_message = st.chat_input(
+            f"{selected_partner['name']}さんにメッセージを送る"
+        )
+
+
+        if new_message:
+
+            new_message = new_message.strip()
+
+
+            if new_message:
+
+                try:
+
+                    supabase.table(
+                        "messages"
+                    ).insert(
+                        {
+                            "sender_id": my_profile["id"],
+                            "receiver_id": partner_id,
+                            "message": new_message
+                        }
+                    ).execute()
+
+
+                    st.rerun()
+
+
+                except Exception as e:
+
+                    st.error(
+                        "メッセージを送信できませんでした。"
+                    )
+
+                    st.code(str(e))
