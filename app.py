@@ -1099,21 +1099,36 @@ with tab_profile:
                     )
                 }
 
-                (
-                    supabase
-                    .table("profiles")
-                    .update(update_data)
-                    .eq(
-                        "id",
-                        my_profile["id"]
-                    )
-                    .eq(
-                        "auth_id",
-                        user_id
-                    )
-                    .execute()
-                )
+                update_response = (
+    supabase
+    .table("profiles")
+    .update(update_data)
+    .eq(
+        "id",
+        my_profile["id"]
+    )
+    .eq(
+        "auth_id",
+        user_id
+    )
+    .execute()
+)
 
+if not update_response.data:
+    st.error(
+        "プロフィールを更新できませんでした。"
+        "SupabaseのRLSポリシーを確認してください。"
+    )
+else:
+    st.success(
+        "プロフィールを更新しました！🐝"
+    )
+
+    st.info(
+        "変更内容を反映しました。"
+    )
+
+    st.rerun()
                 st.success(
                     "プロフィールを更新しました！🐝"
                 )
