@@ -45,6 +45,34 @@ if "refresh_token" not in st.session_state:
     st.session_state.refresh_token = None
 
 
+# ---------------------------------------------------------
+# ブラウザCookieからログイン情報を復元
+# ---------------------------------------------------------
+
+if (
+    st.session_state.access_token is None
+    or st.session_state.refresh_token is None
+):
+
+    saved_access_token = cookie_manager.get(
+        "campushive_access_token"
+    )
+
+    saved_refresh_token = cookie_manager.get(
+        "campushive_refresh_token"
+    )
+
+    if saved_access_token and saved_refresh_token:
+
+        st.session_state.access_token = (
+            saved_access_token
+        )
+
+        st.session_state.refresh_token = (
+            saved_refresh_token
+        )
+
+
 # =========================================================
 # ログイン画面
 # =========================================================
@@ -115,19 +143,36 @@ def login_page():
 
                     if session:
 
-                        st.session_state.access_token = (
-                            session.access_token
-                        )
+    st.session_state.access_token = (
+        session.access_token
+    )
 
-                        st.session_state.refresh_token = (
-                            session.refresh_token
-                        )
+    st.session_state.refresh_token = (
+        session.refresh_token
+    )
 
-                        st.success(
-                            "ログインしました！"
-                        )
+    # ブラウザCookieに保存
+    cookie_manager.set(
+        "campushive_access_token",
+        session.access_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
 
-                        st.rerun()
+    cookie_manager.set(
+        "campushive_refresh_token",
+        session.refresh_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
+
+    st.success(
+        "ログインしました！"
+    )
+
+    st.rerun()
 
                     else:
 
@@ -208,22 +253,38 @@ def login_page():
                     )
 
                     # Confirm emailがOFFの場合
-                    if response.session:
+                   if response.session:
 
-                        st.session_state.access_token = (
-                            response.session.access_token
-                        )
+    st.session_state.access_token = (
+        response.session.access_token
+    )
 
-                        st.session_state.refresh_token = (
-                            response.session.refresh_token
-                        )
+    st.session_state.refresh_token = (
+        response.session.refresh_token
+    )
 
-                        st.success(
-                            "アカウントを作成しました！"
-                        )
+    # ブラウザCookieに保存
+    cookie_manager.set(
+        "campushive_access_token",
+        response.session.access_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
 
-                        st.rerun()
+    cookie_manager.set(
+        "campushive_refresh_token",
+        response.session.refresh_token,
+        max_age=60 * 60 * 24 * 30,
+        secure=True,
+        same_site="lax"
+    )
 
+    st.success(
+        "アカウントを作成しました！"
+    )
+
+    st.rerun()
                     else:
 
                         st.success(
@@ -341,11 +402,18 @@ with st.sidebar:
         except Exception:
             pass
 
-        st.session_state.access_token = None
-        st.session_state.refresh_token = None
+       st.session_state.access_token = None
+st.session_state.refresh_token = None
 
-        st.rerun()
+cookie_manager.delete(
+    "campushive_access_token"
+)
 
+cookie_manager.delete(
+    "campushive_refresh_token"
+)
+
+st.rerun()
 
 # =========================================================
 # プロフィール未登録の場合
