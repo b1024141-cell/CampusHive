@@ -4,6 +4,7 @@ import random
 import extra_streamlit_components as stx
 from supabase import create_client
 
+
 # =========================================================
 # ページ設定
 # =========================================================
@@ -15,7 +16,6 @@ st.set_page_config(
 )
 
 
-
 # =========================================================
 # Supabase接続
 # =========================================================
@@ -23,17 +23,13 @@ st.set_page_config(
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 
-supabase = create_client(
-    url,
-    key
-)
-# =========================================================
-# ログインCookie
-# =========================================================
+supabase = create_client(url, key)
 
 cookie_manager = stx.CookieManager(
     key="campushive_cookie_manager"
 )
+
+
 # =========================================================
 # セッション管理
 # =========================================================
@@ -45,10 +41,7 @@ if "refresh_token" not in st.session_state:
     st.session_state.refresh_token = None
 
 
-# ---------------------------------------------------------
-# ブラウザCookieからログイン情報を復元
-# ---------------------------------------------------------
-
+# Cookieからログイン状態を復元
 if (
     st.session_state.access_token is None
     or st.session_state.refresh_token is None
@@ -64,13 +57,8 @@ if (
 
     if saved_access_token and saved_refresh_token:
 
-        st.session_state.access_token = (
-            saved_access_token
-        )
-
-        st.session_state.refresh_token = (
-            saved_refresh_token
-        )
+        st.session_state.access_token = saved_access_token
+        st.session_state.refresh_token = saved_refresh_token
 
 
 # =========================================================
@@ -141,53 +129,16 @@ def login_page():
 
                     session = response.session
 
-                   if session:
+                    if session:
 
-                   st.session_state.access_token = (
-                   session.access_token
-                   )
-
-                   st.session_state.refresh_token = (
-                   session.refresh_token
-                   )
-
-                   cookie_manager.set(
-                   "campushive_access_token",
-                    session.access_token,
-                    max_age=60 * 60 * 24 * 30,
-                    secure=True,
-                    same_site="lax"
-                    )
-
-                   cookie_manager.set(
-                    "campushive_refresh_token",
-                    session.refresh_token,
-                    max_age=60 * 60 * 24 * 30,
-                    secure=True,
-                    same_site="lax"
-                    ) 
-
-                    st.success(
-                        "ログインしました！"
-                    )
-                
-                    st.rerun()
-
-                    else:
-                    
-                        st.error(
-                            "ログインセッションを取得できませんでした。"
+                        st.session_state.access_token = (
+                            session.access_token
                         )
-                    
-                        st.error(
-                            "ログインセッションを取得できませんでした。"
-                        )
-                    
+
                         st.session_state.refresh_token = (
                             session.refresh_token
                         )
-                    
-                        # ブラウザCookieに保存
+
                         cookie_manager.set(
                             "campushive_access_token",
                             session.access_token,
@@ -195,7 +146,7 @@ def login_page():
                             secure=True,
                             same_site="lax"
                         )
-                    
+
                         cookie_manager.set(
                             "campushive_refresh_token",
                             session.refresh_token,
@@ -203,14 +154,14 @@ def login_page():
                             secure=True,
                             same_site="lax"
                         )
-                    
+
                         st.success(
                             "ログインしました！"
                         )
-                    
+
                         st.rerun()
-                    
-                                        else:
+
+                    else:
 
                         st.error(
                             "ログインセッションを取得できませんでした。"
@@ -289,38 +240,38 @@ def login_page():
                     )
 
                     # Confirm emailがOFFの場合
-                   if response.session:
+                    if response.session:
 
-    st.session_state.access_token = (
-        response.session.access_token
-    )
+                        st.session_state.access_token = (
+                            response.session.access_token
+                        )
 
-    st.session_state.refresh_token = (
-        response.session.refresh_token
-    )
+                        st.session_state.refresh_token = (
+                            response.session.refresh_token
+                        )
 
-    # ブラウザCookieに保存
-    cookie_manager.set(
-        "campushive_access_token",
-        response.session.access_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
+                        cookie_manager.set(
+                            "campushive_access_token",
+                            response.session.access_token,
+                            max_age=60 * 60 * 24 * 30,
+                            secure=True,
+                            same_site="lax"
+                        )
 
-    cookie_manager.set(
-        "campushive_refresh_token",
-        response.session.refresh_token,
-        max_age=60 * 60 * 24 * 30,
-        secure=True,
-        same_site="lax"
-    )
+                        cookie_manager.set(
+                            "campushive_refresh_token",
+                            response.session.refresh_token,
+                            max_age=60 * 60 * 24 * 30,
+                            secure=True,
+                            same_site="lax"
+                        )
 
-    st.success(
-        "アカウントを作成しました！"
-    )
+                        st.success(
+                            "アカウントを作成しました！"
+                        )
 
-    st.rerun()
+                        st.rerun()
+
                     else:
 
                         st.success(
@@ -438,18 +389,17 @@ with st.sidebar:
         except Exception:
             pass
 
-       st.session_state.access_token = None
-st.session_state.refresh_token = None
+        st.session_state.access_token = None
+        st.session_state.refresh_token = None
 
-cookie_manager.delete(
-    "campushive_access_token"
-)
+        try:
+            cookie_manager.delete("campushive_access_token")
+            cookie_manager.delete("campushive_refresh_token")
+        except Exception:
+            pass
 
-cookie_manager.delete(
-    "campushive_refresh_token"
-)
+        st.rerun()
 
-st.rerun()
 
 # =========================================================
 # プロフィール未登録の場合
@@ -560,6 +510,7 @@ if my_profile is None:
             type="primary"
         )
 
+
     if submit_profile:
 
         if not name:
@@ -603,6 +554,8 @@ if my_profile is None:
                 st.code(str(e))
 
     st.stop()
+
+
 # =========================================================
 # メイン画面
 # =========================================================
